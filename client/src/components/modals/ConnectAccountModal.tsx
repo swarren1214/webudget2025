@@ -75,11 +75,12 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
     // Create Plaid Link instance
     const handler = (window as any).Plaid.create({
       token: linkToken,
-      onSuccess: (public_token: string) => {
+      onSuccess: (public_token: string, metadata: any) => {
         handlePlaidSuccess(public_token);
       },
-      onExit: (err: any) => {
+      onExit: (err: any, metadata: any) => {
         if (err) {
+          console.error("Plaid exit error:", err);
           toast({
             title: "Connection Exited",
             description: err.error_message || "The connection process was canceled.",
@@ -87,10 +88,12 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
           });
         }
       },
-      onLoad: () => {
-        // Handle the link loaded
+      onEvent: (eventName: string, metadata: any) => {
+        console.log("Plaid event:", eventName, metadata);
       },
-      receivedRedirectUri: window.location.href,
+      onLoad: () => {
+        console.log("Plaid Link loaded successfully");
+      },
     });
     
     // Open Plaid Link

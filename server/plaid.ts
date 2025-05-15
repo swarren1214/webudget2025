@@ -16,15 +16,21 @@ export const plaidClient = new PlaidApi(configuration);
 // Function to create a link token
 export async function createLinkToken(userId: number) {
   try {
-    const response = await plaidClient.linkTokenCreate({
+    // Define the configuration for the link token
+    const linkTokenConfig = {
       user: {
         client_user_id: userId.toString(),
       },
       client_name: 'WeBudget',
       products: [Products.Transactions, Products.Auth, Products.Liabilities],
       country_codes: [CountryCode.Us],
-      language: 'en',
-    });
+      language: 'en'
+    };
+
+    // Create the link token with the configuration
+    console.log("Creating link token with config:", JSON.stringify(linkTokenConfig, null, 2));
+    const response = await plaidClient.linkTokenCreate(linkTokenConfig);
+    console.log("Link token created successfully");
     return response.data;
   } catch (error) {
     console.error('Error creating link token:', error);
