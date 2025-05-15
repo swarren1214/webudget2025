@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Dialog,
@@ -14,6 +14,7 @@ import { Search, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/api";
 
 interface ConnectAccountModalProps {
   isOpen: boolean;
@@ -37,28 +38,78 @@ const popularBanks: Bank[] = [
 const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const createLinkTokenMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/plaid/create-link-token', {});
-      return res.json();
-    },
-    onSuccess: (data) => {
+  // Create a link token when the modal opens
+  useEffect(() => {
+    if (isOpen && !linkToken) {
+      createLinkTokenMutation.mutate();
+    }
+  }, [isOpen]);
+  
+  // Function to handle Plaid success
+  const handlePlaidSuccess = useCallback(async (publicToken: string) => {
+    try {
+      const exchangeData = await exchangePlaidPublicToken(publicToken);
       toast({
-        title: "Bank connection initiated",
-        description: `Connecting to ${selectedBank?.name}...`,
+        title: "Account Connected",
+        description: "Your bank account has been successfully connected.",
       });
-      // In a real app, you would initialize Plaid Link with the token
-      console.log("Link token:", data.link_token);
       onClose();
       queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "There was an error connecting your account. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [onClose, queryClient, toast]);
+  
+  // Function to open Plaid Link
+  const openPlaidLink = useCallback(() => {
+    if (!linkToken) return;
+    
+    // Create Plaid Link instance
+    const handler = (window as any).Plaid.create({
+      token: linkToken,
+      onSuccess: (public_token: string) => {
+        handlePlaidSuccess(public_token);
+      },
+      onExit: (err: any) => {
+        if (err) {
+          toast({
+            title: "Connection Exited",
+            description: err.error_message || "The connection process was canceled.",
+            variant: "destructive",
+          });
+        }
+      },
+      onLoad: () => {
+        // Handle the link loaded
+      },
+      receivedRedirectUri: window.location.href,
+    });
+    
+    // Open Plaid Link
+    handler.open();
+  }, [linkToken, handlePlaidSuccess, toast]);
+  
+  // Mutation to create a link token
+  const createLinkTokenMutation = useMutation({
+    mutationFn: async () => {
+      const response = await createPlaidLinkToken();
+      return response;
+    },
+    onSuccess: (data) => {
+      setLinkToken(data.link_token);
     },
     onError: () => {
       toast({
-        title: "Connection failed",
-        description: "Could not connect to the bank. Please try again.",
+        title: "Connection Failed",
+        description: "Could not initialize bank connection. Please try again.",
         variant: "destructive",
       });
     }
@@ -70,7 +121,17 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
   
   const handleConnectBank = () => {
     if (!selectedBank) return;
-    createLinkTokenMutation.mutate();
+    
+    // If we have a link token, open Plaid Link
+    if (linkToken) {
+      openPlaidLink();
+    } else {
+      toast({
+        title: "Connection Error",
+        description: "Could not initialize the connection. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
   
   return (
