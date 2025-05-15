@@ -469,11 +469,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Plaid API routes
   app.post("/api/plaid/create-link-token", async (req: Request, res: Response) => {
     try {
-      // In a real app, you would interact with Plaid API
-      // For this demo, return a mock link token
-      return res.status(200).json({ link_token: "mock-link-token-" + Date.now() });
+      // Get the user ID (in a real app, this would come from the session)
+      const user = await storage.getUserByUsername('demo');
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Import the Plaid functions
+      const { createLinkToken } = await import('./plaid');
+      
+      // Create a link token
+      const linkTokenResponse = await createLinkToken(user.id);
+      return res.status(200).json({ link_token: linkTokenResponse.link_token });
     } catch (error) {
-      return res.status(500).json({ message: "Server error" });
+      console.error('Error creating link token:', error);
+      return res.status(500).json({ message: "Error creating link token" });
     }
   });
 
@@ -481,11 +491,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { publicToken } = plaidExchangeSchema.parse(req.body);
       
-      // In a real app, you would exchange with Plaid API
-      // For this demo, return mock data
+      // Import the Plaid functions
+      const { exchangePublicToken, getPlaidAccounts } = await import('./plaid');
+      
+      // Exchange the public token for an access token
+      const exchangeResponse = await exchangePublicToken(publicToken);
+      const accessToken = exchangeResponse.access_token;
+      const itemId = exchangeResponse.item_id;
+      
+      // Get the user (in a real app, this would come from the session)
+      const user = await storage.getUserByUsername('demo');
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Get account information from Plaid
+      const accountsResponse = await getPlaidAccounts(accessToken);
+      
+      // Create accounts in our database
+      for (const account of accountsResponse.accounts) {
+        await storage.createAccount({
+          userId: user.id,
+          name: account.name,
+          type: account.type,
+          balance: account.balances.current || 0,
+          accountNumber: account.mask ? `****${account.mask}` : "****1234",
+          institutionName: accountsResponse.item.institution_id || "Unknown Bank",
+          institutionLogo: "",
+          plaidAccessToken: accessToken,
+          plaidItemId: itemId,
+          isConnected: true
+        });
+      }
+      
+      // Return the tokens
       return res.status(200).json({ 
-        access_token: "access-token-" + Date.now(),
-        item_id: "item-id-" + Date.now() 
+        access_token: accessToken,
+        item_id: itemId 
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
