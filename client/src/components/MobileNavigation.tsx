@@ -23,12 +23,14 @@ function MobileNavigation() {
       {navigation.map((item) => {
         const isActive = location === item.href;
         return (
-          <Link href={item.href} key={item.name}>
-            <a className={`flex flex-col items-center ${isActive ? "text-primary" : "text-gray-500"}`}>
-              <item.icon className="h-5 w-5" />
-              <span className="text-xs mt-1">{item.name}</span>
-            </a>
-          </Link>
+          <div 
+            key={item.name}
+            className={`flex flex-col items-center cursor-pointer ${isActive ? "text-primary" : "text-gray-500"}`}
+            onClick={() => window.location.href = item.href}
+          >
+            <item.icon className="h-5 w-5" />
+            <span className="text-xs mt-1">{item.name}</span>
+          </div>
         );
       })}
     </nav>

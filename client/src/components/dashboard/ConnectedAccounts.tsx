@@ -47,22 +47,24 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
       <CardContent>
         <div className="space-y-3">
           {accounts.map(account => (
-            <Link key={account.id} href={`/accounts/${account.id}`}>
-              <div className="p-3 border border-gray-200 rounded-lg flex items-center justify-between hover:bg-gray-50 cursor-pointer">
-                <div className="flex items-center">
-                  <div className={`w-10 h-10 rounded-md flex items-center justify-center ${getColorForAccountType(account.type)}`}>
-                    <span className="material-icons">{getIconForAccountType(account.type)}</span>
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium">{account.name}</p>
-                    <p className="text-xs text-muted-foreground">{account.type.charAt(0).toUpperCase() + account.type.slice(1)} {account.accountNumber}</p>
-                  </div>
+            <div 
+              key={account.id}
+              className="p-3 border border-gray-200 rounded-lg flex items-center justify-between hover:bg-gray-50 cursor-pointer"
+              onClick={() => window.location.href = `/accounts/${account.id}`}
+            >
+              <div className="flex items-center">
+                <div className={`w-10 h-10 rounded-md flex items-center justify-center ${getColorForAccountType(account.type)}`}>
+                  <span className="material-icons">{getIconForAccountType(account.type)}</span>
                 </div>
-                <p className={`font-semibold tabular-nums ${account.balance < 0 ? 'text-red-500' : ''}`}>
-                  {account.balance < 0 ? '-' : ''}${Math.abs(account.balance).toFixed(2)}
-                </p>
+                <div className="ml-3">
+                  <p className="font-medium">{account.name}</p>
+                  <p className="text-xs text-muted-foreground">{account.type.charAt(0).toUpperCase() + account.type.slice(1)} {account.accountNumber}</p>
+                </div>
               </div>
-            </Link>
+              <p className={`font-semibold tabular-nums ${account.balance < 0 ? 'text-red-500' : ''}`}>
+                {account.balance < 0 ? '-' : ''}${Math.abs(account.balance).toFixed(2)}
+              </p>
+            </div>
           ))}
           
           <div 

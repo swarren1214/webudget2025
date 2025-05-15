@@ -49,16 +49,17 @@ function Sidebar({ className = "", onClose }: SidebarProps) {
               const isActive = location === item.href;
               return (
                 <li key={item.name}>
-                  <Link href={item.href}>
-                    <a className={`flex items-center px-4 py-3 ${
+                  <div 
+                    className={`flex items-center px-4 py-3 cursor-pointer ${
                       isActive 
                         ? "text-primary bg-blue-50 border-l-4 border-primary" 
                         : "text-gray-600 hover:bg-gray-50"
-                    }`}>
-                      <item.icon className="mr-3 h-5 w-5" />
-                      {item.name}
-                    </a>
-                  </Link>
+                    }`}
+                    onClick={() => window.location.href = item.href}
+                  >
+                    <item.icon className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </div>
                 </li>
               );
             })}
