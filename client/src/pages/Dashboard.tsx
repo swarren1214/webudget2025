@@ -82,7 +82,7 @@ function Dashboard() {
           <>
             <SummaryCard 
               title="Total Balance" 
-              amount={totalBalance.toLocaleString()}
+              amount={totalBalance}
               change={1520.25}
               changePercent={6.2}
               changeText="this month"
@@ -91,7 +91,7 @@ function Dashboard() {
             />
             <SummaryCard 
               title="Monthly Income" 
-              amount={monthlyIncome.toLocaleString()}
+              amount={monthlyIncome}
               change={240.00}
               changePercent={4.8}
               changeText="vs. last month"
@@ -100,7 +100,7 @@ function Dashboard() {
             />
             <SummaryCard 
               title="Monthly Expenses" 
-              amount={monthlyExpenses.toLocaleString()}
+              amount={monthlyExpenses}
               change={-120.45}
               changePercent={-3.1}
               changeText="vs. last month"
@@ -148,6 +148,7 @@ function Dashboard() {
       <ConnectAccountModal 
         isOpen={showConnectModal} 
         onClose={() => setShowConnectModal(false)} 
+        accountId={0}
       />
       
       <TransferModal 
