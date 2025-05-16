@@ -130,7 +130,12 @@ export const createPlaidLinkToken = async (): Promise<{ link_token: string }> =>
   return res.json();
 };
 
-export const exchangePlaidPublicToken = async (publicToken: string): Promise<{ access_token: string; item_id: string }> => {
-  const res = await apiRequest("POST", "/api/plaid/exchange-public-token", { publicToken });
+export const exchangePlaidPublicToken = async (publicToken: string, accountId: number): Promise<{ message: string }> => {
+  const res = await apiRequest("POST", "/api/plaid/exchange-token", { publicToken, accountId });
+  return res.json();
+};
+
+export const syncTransactions = async (accountId: number): Promise<{ message: string }> => {
+  const res = await apiRequest("POST", `/api/plaid/sync-transactions`, { accountId });
   return res.json();
 };

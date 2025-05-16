@@ -10,13 +10,14 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import ConnectAccountModal from "./modals/ConnectAccountModal";
+import logo from "@/assets/webudget-logo.png";
 
 interface SidebarProps {
   className?: string;
   onClose?: () => void;
 }
 
-function Sidebar({ className = "", onClose }: SidebarProps) {
+function SidebarComponent({ className = "", onClose }: SidebarProps) {
   const [location] = useLocation();
   const [showConnectModal, setShowConnectModal] = useState(false);
   
@@ -30,53 +31,45 @@ function Sidebar({ className = "", onClose }: SidebarProps) {
   
   return (
     <>
-      <aside className={`w-64 bg-white border-r border-gray-200 flex flex-col ${className}`}>
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-primary flex items-center">
-            <span className="material-icons mr-2">account_balance_wallet</span>
-            WeBudget
-          </h1>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
-          )}
+      <aside className={`fixed top-0 left-0 z-40 h-screen transition-transform w-64 flex flex-col justify-between ${className}`} style={{ background: "linear-gradient(270deg, #1DCC67 0.19%, #009F23 99.92%)" }}>
+        <div>
+          <div className="p-6 flex items-center justify-center border-b border-transparent">
+            <img src={logo} alt="WeBudget Logo" style={{ maxHeight: '40px', width: 'auto', display: 'block', margin: '0 auto' }} />
+          </div>
+          <nav className="py-4 px-3">
+            <ul className="space-y-1">
+              {navigation.map((item) => {
+                const isActive = location === item.href;
+                return (
+                  <li key={item.name}>
+                    <Link
+                      href={item.href}
+                      className={`flex items-center px-4 py-3 cursor-pointer rounded-lg transition-colors font-medium text-white ${
+                        isActive 
+                          ? "bg-white/20" 
+                          : "hover:bg-white/10"
+                      }`}
+                    >
+                      <item.icon className="mr-3 h-5 w-5 text-white" />
+                      {item.name}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
         </div>
-        
-        <nav className="flex-1 overflow-y-auto py-4">
-          <ul className="space-y-1">
-            {navigation.map((item) => {
-              const isActive = location === item.href;
-              return (
-                <li key={item.name}>
-                  <div 
-                    className={`flex items-center px-4 py-3 cursor-pointer ${
-                      isActive 
-                        ? "text-primary bg-blue-50 border-l-4 border-primary" 
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                    onClick={() => window.location.href = item.href}
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-        
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-white/10">
           <Button 
-            className="w-full"
+            className="w-full bg-white/20 text-white hover:bg-white/30 border-none sidebar-button"
             onClick={() => setShowConnectModal(true)}
+            style={{ boxShadow: "none" }}
           >
             <span className="material-icons mr-2">add</span>
             Connect Account
           </Button>
         </div>
       </aside>
-      
       <ConnectAccountModal 
         isOpen={showConnectModal} 
         onClose={() => setShowConnectModal(false)} 
@@ -85,4 +78,4 @@ function Sidebar({ className = "", onClose }: SidebarProps) {
   );
 }
 
-export default Sidebar;
+export default SidebarComponent;

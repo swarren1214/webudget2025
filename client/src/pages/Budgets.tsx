@@ -48,6 +48,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import NewBudgetWizardModal from "@/components/modals/NewBudgetWizardModal";
 
 const budgetFormSchema = z.object({
   name: z.string().min(1, "Category name is required"),
@@ -148,10 +149,7 @@ function Budgets() {
   
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    return '$' + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
   
   return (
@@ -163,6 +161,8 @@ function Budgets() {
           Create Budget
         </Button>
       </div>
+      
+      <NewBudgetWizardModal open={showAddBudgetDialog} onOpenChange={setShowAddBudgetDialog} />
       
       {/* Budget Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -267,57 +267,6 @@ function Budgets() {
           </Card>
         </div>
       </div>
-      
-      {/* Add Budget Dialog */}
-      <Dialog open={showAddBudgetDialog} onOpenChange={setShowAddBudgetDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Budget Category</DialogTitle>
-            <DialogDescription>
-              Add a new budget category to track your spending.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Groceries" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="limit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monthly Budget Limit</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
-                        <Input type="number" min={0} className="pl-8" {...field} />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <DialogFooter>
-                <Button type="submit">Create Budget</Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
       
       {/* Edit Budget Dialog */}
       <Dialog open={showEditBudgetDialog} onOpenChange={setShowEditBudgetDialog}>

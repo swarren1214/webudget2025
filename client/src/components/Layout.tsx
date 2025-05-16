@@ -20,33 +20,36 @@ function Layout({ children }: LayoutProps) {
   }, [location]);
   
   return (
-    <div className="h-screen flex flex-col lg:flex-row overflow-hidden">
-      {/* Desktop Sidebar - visible on large screens */}
-      <Sidebar className="hidden lg:flex" />
-      
-      {/* Mobile Sidebar - conditionally visible */}
-      {isMobile && showMobileSidebar && (
-        <Sidebar 
-          className="fixed inset-0 z-50 bg-white" 
-          onClose={() => setShowMobileSidebar(false)}
-        />
-      )}
-      
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Navigation Bar */}
-        <Header onMenuClick={() => setShowMobileSidebar(true)} />
-        
-        {/* Main Content Scrollable Area */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+      {/* Sidebar (fixed for desktop, overlays for mobile) */}
+      <div className="">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block fixed inset-y-0 left-0 w-64 z-30">
+          <Sidebar />
+        </div>
+        {/* Mobile Sidebar (overlay) */}
+        {isMobile && showMobileSidebar && (
+          <div className="fixed inset-0 z-40 bg-black/40">
+            <Sidebar className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700" onClose={() => setShowMobileSidebar(false)} />
+          </div>
+        )}
+      </div>
+
+      {/* Main Area */}
+      <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
+        {/* Header */}
+        <div className="sticky top-0 z-20">
+          <Header onMenuClick={() => setShowMobileSidebar(true)} />
+        </div>
+        {/* Main Content */}
+        <main className="flex-1 p-4 lg:p-6">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>
-        </div>
-        
+        </main>
         {/* Mobile Bottom Navigation */}
         <MobileNavigation />
-      </main>
+      </div>
     </div>
   );
 }

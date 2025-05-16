@@ -45,7 +45,7 @@ const BudgetProgress = ({ categories, transactions }: BudgetProgressProps) => {
                   <span className="font-medium">{category.name}</span>
                 </div>
                 <div className="font-mono">
-                  <span className="font-medium">${category.spent.toFixed(2)}</span> / <span className="text-muted-foreground">${category.limit.toFixed(0)}</span>
+                  <span className={`font-medium`}>${category.spent.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span> / <span className="text-muted-foreground">${category.limit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
               </div>
               <Progress 

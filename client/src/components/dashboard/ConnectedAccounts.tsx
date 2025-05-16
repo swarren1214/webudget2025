@@ -62,7 +62,7 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
                 </div>
               </div>
               <p className={`font-semibold tabular-nums ${account.balance < 0 ? 'text-red-500' : ''}`}>
-                {account.balance < 0 ? '-' : ''}${Math.abs(account.balance).toFixed(2)}
+                {account.balance < 0 ? '-' : ''}${Math.abs(account.balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
               </p>
             </div>
           ))}

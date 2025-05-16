@@ -6,10 +6,16 @@ import {
   insertAccountSchema,
   insertTransactionSchema,
   insertBudgetCategorySchema,
-  insertTransferSchema,
-  plaidExchangeSchema
+  insertTransferSchema
 } from "@shared/schema";
 import { z } from "zod";
+import { exchangePublicToken, getPlaidAccounts, syncPlaidTransactions } from "./plaid";
+
+// Define the Plaid exchange schema
+const plaidExchangeSchema = z.object({
+  publicToken: z.string(),
+  accountId: z.number()
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
@@ -421,25 +427,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transfers", async (req: Request, res: Response) => {
     try {
       const transferData = insertTransferSchema.parse(req.body);
-      
+
       // Check if accounts exist
       const fromAccount = await storage.getAccount(transferData.fromAccountId);
       if (!fromAccount) {
         return res.status(404).json({ message: "Source account not found" });
       }
-      
+
       const toAccount = await storage.getAccount(transferData.toAccountId);
       if (!toAccount) {
         return res.status(404).json({ message: "Destination account not found" });
       }
-      
+
       // Check sufficient funds
       if (fromAccount.balance < transferData.amount) {
         return res.status(400).json({ message: "Insufficient funds" });
       }
-      
-      const transfer = await storage.createTransfer(transferData);
-      return res.status(201).json(transfer);
+
+      // If both accounts are Plaid-linked, use Plaid transfer API
+      if (fromAccount.plaidAccessToken && fromAccount.plaidAccessToken !== '' && fromAccount.plaidItemId && fromAccount.plaidItemId !== '') {
+        try {
+          // Import Plaid transfer function
+          const { createPlaidTransfer } = await import('./plaid');
+          // For demo, use Plaid account_id fromAccount.plaidItemId (should be Plaid account_id, not item_id)
+          // You may need to store Plaid account_id in your accounts table for real use
+          // We'll assume fromAccount.accountNumber is the Plaid account_id for this demo
+          const plaidAccountId = fromAccount.accountNumber;
+          // Get user info (for demo, use static values)
+          const user = { legalName: 'Demo User', email: 'demo@example.com' };
+          const plaidResult = await createPlaidTransfer({
+            accessToken: fromAccount.plaidAccessToken,
+            amount: transferData.amount,
+            user,
+            fromAccountPlaidId: plaidAccountId,
+            description: transferData.note || 'ACH transfer',
+          });
+          // Store Plaid transfer ID and status
+          const transfer = await storage.createTransfer({
+            ...transferData,
+            plaidTransferId: plaidResult.plaidTransferId,
+            status: plaidResult.status,
+          });
+          return res.status(201).json(transfer);
+        } catch (plaidError: any) {
+          console.error('Plaid transfer error:', plaidError);
+          return res.status(500).json({ message: 'Plaid transfer failed', plaidError: plaidError?.response?.data || plaidError.message });
+        }
+      } else {
+        // Fallback: local transfer logic
+        const transfer = await storage.createTransfer({
+          ...transferData,
+          plaidTransferId: null,
+          status: 'completed',
+        });
+        return res.status(201).json(transfer);
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
@@ -487,48 +529,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/plaid/exchange-public-token", async (req: Request, res: Response) => {
+  app.post("/api/plaid/sync-transactions", async (req: Request, res: Response) => {
     try {
-      const { publicToken } = plaidExchangeSchema.parse(req.body);
+      const { accountId } = z.object({ accountId: z.number() }).parse(req.body);
       
-      // Import the Plaid functions
-      const { exchangePublicToken, getPlaidAccounts } = await import('./plaid');
-      
-      // Exchange the public token for an access token
-      const exchangeResponse = await exchangePublicToken(publicToken);
-      const accessToken = exchangeResponse.access_token;
-      const itemId = exchangeResponse.item_id;
-      
-      // Get the user (in a real app, this would come from the session)
-      const user = await storage.getUserByUsername('demo');
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      // Get the account
+      const account = await storage.getAccount(accountId);
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
       }
       
-      // Get account information from Plaid
-      const accountsResponse = await getPlaidAccounts(accessToken);
-      
-      // Create accounts in our database
-      for (const account of accountsResponse.accounts) {
-        await storage.createAccount({
-          userId: user.id,
-          name: account.name,
-          type: account.type,
-          balance: account.balances.current || 0,
-          accountNumber: account.mask ? `****${account.mask}` : "****1234",
-          institutionName: accountsResponse.item.institution_id || "Unknown Bank",
-          institutionLogo: "",
-          plaidAccessToken: accessToken,
-          plaidItemId: itemId,
-          isConnected: true
-        });
+      if (!account.plaidAccessToken) {
+        return res.status(400).json({ message: "Account is not connected to Plaid" });
       }
       
-      // Return the tokens
-      return res.status(200).json({ 
-        access_token: accessToken,
-        item_id: itemId 
+      // Sync transactions
+      await syncPlaidTransactions(account.plaidAccessToken, accountId, storage);
+      
+      return res.status(200).json({ message: "Transactions synced successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/plaid/exchange-token", async (req: Request, res: Response) => {
+    try {
+      const { publicToken, accountId } = plaidExchangeSchema.parse(req.body);
+      
+      // Exchange public token for access token
+      const { access_token } = await exchangePublicToken(publicToken);
+      
+      // Get account details from Plaid
+      const plaidAccounts = await getPlaidAccounts(access_token);
+      
+      // Update account with Plaid access token
+      const account = await storage.updateAccount(accountId, {
+        plaidAccessToken: access_token,
+        plaidItemId: plaidAccounts.item.item_id,
       });
+      
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      
+      // Sync transactions from Plaid
+      await syncPlaidTransactions(access_token, accountId, storage);
+      
+      return res.status(200).json({ message: "Plaid account connected successfully" });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });

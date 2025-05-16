@@ -1,26 +1,63 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConnectAccountModal from "@/components/modals/ConnectAccountModal";
-import { type Account } from "@shared/schema";
+import { type Account, type InsertAccount } from "@shared/schema";
 import { Plus } from "lucide-react";
+import { createAccount } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 function Accounts() {
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Fetch accounts data
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ['/api/accounts'],
   });
   
+  // Create account mutation
+  const createAccountMutation = useMutation({
+    mutationFn: async (accountData: InsertAccount) => {
+      return createAccount(accountData);
+    },
+    onSuccess: (account) => {
+      setSelectedAccountId(account.id);
+      setShowConnectModal(true);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create account. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+  
+  const handleConnectAccount = async () => {
+    // Create a new account first
+    createAccountMutation.mutate({
+      userId: 1, // In a real app, this would come from the user's session
+      name: "New Account",
+      type: "checking",
+      balance: 0,
+      accountNumber: "****1234",
+      institutionName: "Unknown Bank",
+      institutionLogo: "",
+      isConnected: false
+    });
+  };
+  
   return (
     <>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Accounts</h1>
-        <Button onClick={() => setShowConnectModal(true)}>
+        <Button onClick={handleConnectAccount}>
           <Plus className="mr-2 h-4 w-4" />
           Connect Account
         </Button>
@@ -41,7 +78,7 @@ function Accounts() {
           <Button
             variant="outline"
             className="border-dashed h-[100px] mt-2"
-            onClick={() => setShowConnectModal(true)}
+            onClick={handleConnectAccount}
           >
             <Plus className="mr-2 h-5 w-5" />
             Connect New Account
@@ -51,7 +88,11 @@ function Accounts() {
       
       <ConnectAccountModal 
         isOpen={showConnectModal} 
-        onClose={() => setShowConnectModal(false)} 
+        onClose={() => {
+          setShowConnectModal(false);
+          setSelectedAccountId(null);
+        }}
+        accountId={selectedAccountId || 0}
       />
     </>
   );
@@ -106,7 +147,7 @@ function AccountCard({ account }: AccountCardProps) {
           </div>
           <div className="mt-2 md:mt-0">
             <p className={`text-2xl font-semibold ${account.balance < 0 ? 'text-red-500' : ''}`}>
-              ${Math.abs(account.balance).toFixed(2)}
+              ${Math.abs(account.balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
             </p>
             <p className="text-sm text-muted-foreground">
               {account.balance < 0 ? 'Current Debt' : 'Available Balance'}

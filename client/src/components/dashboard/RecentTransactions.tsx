@@ -109,7 +109,7 @@ const RecentTransactions = ({ transactions }: RecentTransactionsProps) => {
                     </div>
                     <div className="text-right">
                       <p className={`font-semibold tabular-nums ${transaction.isIncome ? 'text-green-500' : 'text-red-500'}`}>
-                        {transaction.isIncome ? '+' : '-'}${transaction.amount.toFixed(2)}
+                        {transaction.isIncome ? '+' : '-'}${transaction.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(transaction.date).toLocaleTimeString('en-US', {

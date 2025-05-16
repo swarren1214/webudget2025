@@ -82,7 +82,7 @@ function Dashboard() {
           <>
             <SummaryCard 
               title="Total Balance" 
-              amount={totalBalance}
+              amount={totalBalance.toLocaleString()}
               change={1520.25}
               changePercent={6.2}
               changeText="this month"
@@ -91,7 +91,7 @@ function Dashboard() {
             />
             <SummaryCard 
               title="Monthly Income" 
-              amount={monthlyIncome}
+              amount={monthlyIncome.toLocaleString()}
               change={240.00}
               changePercent={4.8}
               changeText="vs. last month"
@@ -100,7 +100,7 @@ function Dashboard() {
             />
             <SummaryCard 
               title="Monthly Expenses" 
-              amount={monthlyExpenses}
+              amount={monthlyExpenses.toLocaleString()}
               change={-120.45}
               changePercent={-3.1}
               changeText="vs. last month"

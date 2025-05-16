@@ -107,6 +107,7 @@ export const transfers = pgTable("transfers", {
   date: timestamp("date").notNull(),
   note: text("note"),
   status: text("status").notNull(), // pending, completed, failed
+  plaidTransferId: text("plaid_transfer_id"), // Plaid transfer ID
 });
 
 export const insertTransferSchema = createInsertSchema(transfers).pick({
@@ -116,6 +117,7 @@ export const insertTransferSchema = createInsertSchema(transfers).pick({
   date: true,
   note: true,
   status: true,
+  plaidTransferId: true,
 });
 
 export type InsertTransfer = z.infer<typeof insertTransferSchema>;

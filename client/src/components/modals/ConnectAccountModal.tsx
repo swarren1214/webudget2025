@@ -19,6 +19,7 @@ import { createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/api";
 interface ConnectAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
+  accountId: number;
 }
 
 interface Bank {
@@ -35,16 +36,15 @@ const popularBanks: Bank[] = [
   { id: "capital", name: "Capital One", logo: "account_balance", color: "bg-purple-100 text-purple-600" }
 ];
 
-const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
+const ConnectAccountModal = ({ isOpen, onClose, accountId }: ConnectAccountModalProps) => {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Create a link token when the modal opens
+  // Create a link token and open Plaid Link when the modal opens
   useEffect(() => {
-    if (isOpen && !linkToken) {
+    if (isOpen) {
+      setLinkToken(null);
       createLinkTokenMutation.mutate();
     }
   }, [isOpen]);
@@ -52,13 +52,14 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
   // Function to handle Plaid success
   const handlePlaidSuccess = useCallback(async (publicToken: string) => {
     try {
-      const exchangeData = await exchangePlaidPublicToken(publicToken);
+      await exchangePlaidPublicToken(publicToken, accountId);
       toast({
         title: "Account Connected",
         description: "Your bank account has been successfully connected.",
       });
       onClose();
       queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
     } catch (error) {
       toast({
         title: "Connection Failed",
@@ -66,13 +67,11 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
         variant: "destructive",
       });
     }
-  }, [onClose, queryClient, toast]);
+  }, [onClose, queryClient, toast, accountId]);
   
   // Function to open Plaid Link
   const openPlaidLink = useCallback(() => {
     if (!linkToken) return;
-    
-    // Create Plaid Link instance
     const handler = (window as any).Plaid.create({
       token: linkToken,
       onSuccess: (public_token: string, metadata: any) => {
@@ -86,6 +85,8 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
             description: err.error_message || "The connection process was canceled.",
             variant: "destructive",
           });
+        } else {
+          onClose();
         }
       },
       onEvent: (eventName: string, metadata: any) => {
@@ -95,10 +96,8 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
         console.log("Plaid Link loaded successfully");
       },
     });
-    
-    // Open Plaid Link
     handler.open();
-  }, [linkToken, handlePlaidSuccess, toast]);
+  }, [linkToken, handlePlaidSuccess, toast, onClose]);
   
   // Mutation to create a link token
   const createLinkTokenMutation = useMutation({
@@ -115,84 +114,39 @@ const ConnectAccountModal = ({ isOpen, onClose }: ConnectAccountModalProps) => {
         description: "Could not initialize bank connection. Please try again.",
         variant: "destructive",
       });
+      onClose();
     }
   });
-  
-  const filteredBanks = popularBanks.filter(bank => 
-    bank.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  
-  const handleConnectBank = () => {
-    if (!selectedBank) return;
-    
-    // If we have a link token, open Plaid Link
-    if (linkToken) {
+
+  // Open Plaid Link as soon as linkToken is ready
+  useEffect(() => {
+    if (isOpen && linkToken) {
       openPlaidLink();
-    } else {
-      toast({
-        title: "Connection Error",
-        description: "Could not initialize the connection. Please try again.",
-        variant: "destructive",
-      });
     }
-  };
-  
+  }, [isOpen, linkToken, openPlaidLink]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Connect Your Bank</DialogTitle>
           <DialogDescription>
-            Select your bank to securely connect your accounts via Plaid API.
+            Securely connect your accounts via Plaid API.
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4 py-2">
-          <div className="max-h-60 overflow-y-auto space-y-3">
-            {createLinkTokenMutation.isPending ? (
-              <>
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-                <Skeleton className="h-14 w-full" />
-              </>
-            ) : (
-              filteredBanks.map(bank => (
-                <div 
-                  key={bank.id}
-                  className={`p-3 border border-gray-200 rounded-lg flex items-center hover:bg-gray-50 cursor-pointer ${
-                    selectedBank?.id === bank.id ? 'border-primary border-2' : ''
-                  }`}
-                  onClick={() => setSelectedBank(bank)}
-                >
-                  <div className={`w-10 h-10 rounded-md flex items-center justify-center mr-3 ${bank.color}`}>
-                    <span className="material-icons">{bank.logo}</span>
-                  </div>
-                  <p className="font-medium">{bank.name}</p>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <div className="relative">
-            <Input
-              placeholder="Search for your bank..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          </div>
+        <div className="py-8 flex flex-col items-center justify-center">
+          {createLinkTokenMutation.isPending || !linkToken ? (
+            <>
+              <Skeleton className="h-10 w-2/3 mb-2" />
+              <Skeleton className="h-10 w-2/3 mb-2" />
+              <Skeleton className="h-10 w-2/3" />
+              <p className="mt-4 text-muted-foreground">Preparing secure connection…</p>
+            </>
+          ) : null}
         </div>
-        
         <DialogFooter className="flex space-x-2 justify-end">
           <Button variant="outline" onClick={onClose}>
             Cancel
-          </Button>
-          <Button 
-            onClick={handleConnectBank}
-            disabled={!selectedBank || createLinkTokenMutation.isPending}
-          >
-            Continue
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { type Transaction, type Account } from "@shared/schema";
-import { Calendar, Search, Filter } from "lucide-react";
+import { Calendar, Search, Filter, RefreshCw, Plus } from "lucide-react";
+import { syncTransactions, getBudgetCategories } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import AddTransactionModal from "@/components/modals/AddTransactionModal";
+import TransactionDetailsModal from "@/components/modals/TransactionDetailsModal";
 
 function Transactions() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showAddTransactionModal, setShowAddTransactionModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
   
   // Fetch transactions data
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
@@ -30,9 +38,36 @@ function Transactions() {
     queryKey: ['/api/accounts'],
   });
   
+  // Fetch budget categories
+  const { data: budgetCategories, isLoading: isLoadingBudgets } = useQuery({
+    queryKey: ['/api/budget-categories'],
+    queryFn: getBudgetCategories,
+  });
+  
+  // Sync transactions mutation
+  const syncMutation = useMutation({
+    mutationFn: async (accountId: number) => {
+      return syncTransactions(accountId);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Transactions synced successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to sync transactions. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+  
   // Get unique categories from transactions
   const categories = transactions
-    ? [...new Set(transactions.map(t => t.category).filter(Boolean))]
+    ? Array.from(new Set(transactions.map(t => t.category).filter((c): c is string => c !== null)))
     : [];
   
   // Filter transactions based on search, account, and category
@@ -62,61 +97,94 @@ function Transactions() {
     return accounts?.find(a => a.id === accountId)?.name || "Unknown Account";
   };
   
+  // Handle sync button click
+  const handleSync = () => {
+    if (selectedAccount === "all") {
+      // If "All Accounts" is selected, sync all connected accounts
+      accounts?.forEach(account => {
+        if (account.plaidAccessToken) {
+          syncMutation.mutate(account.id);
+        }
+      });
+    } else {
+      // Sync the selected account
+      syncMutation.mutate(parseInt(selectedAccount));
+    }
+  };
+  
   return (
     <>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <h1 className="text-2xl font-semibold mb-4 md:mb-0">Transactions</h1>
-        <div className="flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Input
-              type="text"
-              placeholder="Search transactions..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          </div>
-          
-          <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="All Accounts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Accounts</SelectItem>
-              {accounts?.map(account => (
-                <SelectItem key={account.id} value={account.id.toString()}>
-                  {account.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map(category => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Button variant="outline" size="icon" className="shrink-0">
-            <Calendar className="h-4 w-4" />
-          </Button>
-          
-          <Button variant="outline" size="icon" className="shrink-0">
-            <Filter className="h-4 w-4" />
-          </Button>
+      </div>
+      <div className="flex flex-wrap gap-2 mb-6">
+        <div className="relative flex-1 min-w-[200px]">
+          <Input
+            type="text"
+            placeholder="Search transactions..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
         </div>
+        <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Accounts" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Accounts</SelectItem>
+            {accounts?.map(account => (
+              <SelectItem key={account.id} value={account.id.toString()}>
+                {account.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map(category => (
+              <SelectItem key={category} value={category}>
+                {category}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button 
+          variant="outline" 
+          size="icon" 
+          className="shrink-0"
+          onClick={handleSync}
+          disabled={syncMutation.isPending}
+        >
+          <RefreshCw className={`h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+        </Button>
+        <Button variant="outline" size="icon" className="shrink-0">
+          <Calendar className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" className="shrink-0">
+          <Filter className="h-4 w-4" />
+        </Button>
+        <Button className="flex items-center gap-2" variant="default" onClick={() => setShowAddTransactionModal(true)}>
+          <Plus className="w-4 h-4 mr-1" />
+          Add Transaction
+        </Button>
       </div>
       
-      {(isLoadingTransactions || isLoadingAccounts) ? (
+      <TransactionDetailsModal
+        open={!!selectedTransaction}
+        onOpenChange={(open) => { if (!open) setSelectedTransaction(null); }}
+        transaction={selectedTransaction}
+        budgets={budgetCategories ? budgetCategories.map(b => ({ name: b.name, color: b.color })) : []}
+      />
+      
+      <AddTransactionModal open={showAddTransactionModal} onOpenChange={setShowAddTransactionModal} accounts={accounts || []} categories={categories} />
+      
+      {(isLoadingTransactions || isLoadingAccounts || isLoadingBudgets) ? (
         <div className="space-y-4">
           <Skeleton className="h-[400px] w-full" />
         </div>
@@ -142,7 +210,8 @@ function Transactions() {
                       {transactions.map(transaction => (
                         <div 
                           key={transaction.id} 
-                          className="flex items-center justify-between py-2 hover:bg-muted/50 rounded-lg px-2"
+                          className="flex items-center justify-between py-2 hover:bg-muted/50 rounded-lg px-2 cursor-pointer"
+                          onClick={() => setSelectedTransaction(transaction)}
                         >
                           <div className="flex items-center">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-3 ${
@@ -171,7 +240,7 @@ function Transactions() {
                           </div>
                           <div className="text-right">
                             <p className={`font-semibold ${transaction.isIncome ? 'text-green-500' : 'text-red-500'}`}>
-                              {transaction.isIncome ? '+' : '-'}${transaction.amount.toFixed(2)}
+                              {transaction.isIncome ? '+' : '-'}${transaction.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {new Date(transaction.date).toLocaleTimeString('en-US', {
