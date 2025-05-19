@@ -9,7 +9,7 @@ import {
   insertTransferSchema
 } from "@shared/schema";
 import { z } from "zod";
-import { exchangePublicToken, getPlaidAccounts, syncPlaidTransactions } from "./plaid";
+import { exchangePublicToken, getPlaidAccounts, syncPlaidTransactions, createLinkToken } from "./plaid";
 
 // Define the Plaid exchange schema
 const plaidExchangeSchema = z.object({
@@ -509,23 +509,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Plaid API routes
-  app.post("/api/plaid/create-link-token", async (req: Request, res: Response) => {
+  app.post("/api/plaid/create-link-token", async (req, res) => {
     try {
-      // Get the user ID (in a real app, this would come from the session)
-      const user = await storage.getUserByUsername('demo');
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Import the Plaid functions
-      const { createLinkToken } = await import('./plaid');
-      
-      // Create a link token
-      const linkTokenResponse = await createLinkToken(user.id);
-      return res.status(200).json({ link_token: linkTokenResponse.link_token });
+      // For demo, use a static userId (replace with real user ID in production)
+      const userId = 1;
+      const data = await createLinkToken(userId);
+      res.json(data);
     } catch (error) {
-      console.error('Error creating link token:', error);
-      return res.status(500).json({ message: "Error creating link token" });
+      console.error("Error creating Plaid link token:", error);
+      res.status(500).json({ message: "Failed to create Plaid link token" });
     }
   });
 
