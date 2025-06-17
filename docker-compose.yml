@@ -7,4 +7,22 @@ services:
       - ./server/.env # Loads environment variables from the .env file in the server directory
     ports:
       - "3000:3000" # Maps port 3000 on the host machine to port 3000 in the container
-    # todo: add database dependency and volumes later
+  
+  # --- PostgreSQL Database Service ---
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      # Use variables loaded from the root .env file
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+# --- Volumes Definition ---
+# This defines the named volume used by the db service
+volumes:
+  postgres_data:
