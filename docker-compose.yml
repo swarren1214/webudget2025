@@ -1,19 +1,18 @@
 services:
   # --- Backend API Service ---
   api:
-    build: ./server # Tells Docker Compose to build an image from the Dockerfile in the ./server directory
-    restart: unless-stopped # Automatically restarts the container unless it was manually stopped
+    build: ./server
+    restart: unless-stopped
     env_file:
-      - ./server/.env # Loads environment variables from the .env file in the server directory
+      - ./server/.env
     ports:
-      - "3000:3000" # Maps port 3000 on the host machine to port 3000 in the container
+      - "3000:3000"
   
   # --- PostgreSQL Database Service ---
   db:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      # Use variables loaded from the root .env file
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -21,8 +20,18 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  
+  # --- API Documentation Service ---
+  docs:
+    image: swaggerapi/swagger-ui:v5.17.14
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      URL: /webudget_api_spec_v1.yaml
+    volumes:
+      - ./server/webudget_api_spec_v1.yaml:/usr/share/nginx/html/webudget_api_spec_v1.yaml
 
 # --- Volumes Definition ---
-# This defines the named volume used by the db service
 volumes:
   postgres_data:
