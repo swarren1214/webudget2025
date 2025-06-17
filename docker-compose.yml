@@ -1,0 +1,10 @@
+services:
+  # --- Backend API Service ---
+  api:
+    build: ./server # Tells Docker Compose to build an image from the Dockerfile in the ./server directory
+    restart: unless-stopped # Automatically restarts the container unless it was manually stopped
+    env_file:
+      - ./server/.env # Loads environment variables from the .env file in the server directory
+    ports:
+      - "3000:3000" # Maps port 3000 on the host machine to port 3000 in the container
+    # todo: add database dependency and volumes later
