@@ -2,6 +2,7 @@
 import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import apiV1Router from './api/routes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -21,6 +22,8 @@ app.use(express.json());
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
+
+app.use('/api/v1', apiV1Router);
 
 // --- Start the Server ---
 app.listen(port, () => {
