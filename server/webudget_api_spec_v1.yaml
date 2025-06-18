@@ -1,0 +1,508 @@
+# WeBudget API Specification v1.0.0
+# This document defines the RESTful API for the WeBudget MVP.
+# It follows the OpenAPI 3.0 standard.
+
+openapi: 3.0.3
+info:
+  title: "WeBudget API"
+  description: |-
+    The official API specification for the WeBudget personal finance management application.
+    This API is used by all WeBudget clients (Web, iOS, Android) to interact with user financial data.
+
+    Core Principles:
+    - **Versioning:** URL Path Versioning (/api/v1)
+    - **Authentication:** JWT via HttpOnly Cookie (and Authorization header for non-web clients)
+    - **Data Format:** JSON with camelCase keys
+    - **Dates:** ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)
+    - **Error Handling:** Standardized JSON error body
+    - **Pagination:** Offset/Limit strategy
+  version: "1.0.0"
+  contact:
+    name: "Backend Team"
+    email: "etiennebeaulac@gmail.com"
+
+# Defines the server environments for the API.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development server
+  - url: https://api.webudget.app/api/v1
+    description: Production server (Future)
+
+# Defines the security scheme for the API. We use JWTs.
+security:
+  - bearerAuth: []
+
+# Organizes endpoints into logical groups.
+tags:
+  - name: Plaid
+    description: Endpoints for integrating with the Plaid API.
+  - name: Institutions
+    description: Endpoints for managing linked financial institutions (Plaid Items).
+  - name: Accounts
+    description: Endpoints for retrieving financial accounts.
+  - name: Transactions
+    description: Endpoints for retrieving transactions.
+  - name: Health
+    description: Application health check.
+
+# ===============================================================================
+# PATHS - The core endpoint definitions for the API.
+# ===============================================================================
+paths:
+  # --- Plaid Integration ---
+  /plaid/create-link-token:
+    post:
+      tags:
+        - Plaid
+      summary: Create Plaid Link Token
+      description: |-
+        Generates a short-lived `link_token` required to initialize the Plaid Link frontend component.
+        This token authorizes the app to connect to a user's financial institution.
+      operationId: createLinkToken
+      responses:
+        "200":
+          description: Successfully created the link token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  linkToken:
+                    type: string
+                    example: "link-sandbox-c8b1b0a7-a37e-405a-8b89-9b993302758f"
+                  expiration:
+                    type: string
+                    format: date-time
+                    example: "2025-06-17T20:53:00.123Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  /plaid/exchange-public-token:
+    post:
+      tags:
+        - Plaid
+      summary: Exchange Public Token
+      description: |-
+        Exchanges a `public_token` (obtained from a successful Plaid Link flow) for a permanent `access_token`.
+        This endpoint securely stores the `access_token` and queues a background job to perform the initial data sync for accounts and transactions.
+        It immediately returns a `202 Accepted` to the client.
+      operationId: exchangePublicToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - publicToken
+                - institution
+              properties:
+                publicToken:
+                  type: string
+                  description: The public token from the Plaid Link success callback.
+                institution:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: The institution's stable identifier from Plaid.
+                    name:
+                      type: string
+                      description: The institution's name from Plaid.
+      responses:
+        "202":
+          description: |-
+            Accepted. The token exchange was successful and the initial data sync has been queued.
+            The client receives the newly created Plaid Item resource with a `syncStatus` of `syncing`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaidItem'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  # --- Institutions (Plaid Items) ---
+  /items/{itemId}:
+    delete:
+      tags:
+        - Institutions
+      summary: Remove Linked Institution
+      description: |-
+        Removes a connection to a financial institution (a Plaid Item) and all of its associated accounts and transactions.
+        This action is irreversible as per the selected deletion policy (hard delete for MVP).
+      operationId: deleteItem
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        "204":
+          description: The institution and all related data were successfully deleted.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  /items/{itemId}/refresh:
+    post:
+      tags:
+        - Institutions
+      summary: Trigger Manual Data Refresh
+      description: |-
+        Triggers an immediate, asynchronous data refresh for a specific institution.
+        The API will respond with `202 Accepted` and queue a background job to sync transactions.
+        The client should monitor the `syncStatus` on the Plaid Item to see the result.
+      operationId: refreshItem
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        "202":
+          description: Accepted. The data refresh has been successfully queued.
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/TooManyRequests'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  # --- Accounts ---
+  /accounts:
+    get:
+      tags:
+        - Accounts
+      summary: Get All Accounts
+      description: |-
+        Returns a list of all financial accounts for the authenticated user, grouped by institution.
+        This is the primary endpoint for the "Accounts" page in the UI.
+      operationId: getAccounts
+      responses:
+        "200":
+          description: A list of the user's accounts, grouped by institution.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlaidItemWithAccounts'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  # --- Transactions ---
+  /transactions:
+    get:
+      tags:
+        - Transactions
+      summary: List All Transactions
+      description: |-
+        Returns a paginated list of all transactions for the authenticated user from all linked accounts.
+        Supports filtering by date range, account, and search query.
+      operationId: getTransactions
+      parameters:
+        - name: limit
+          in: query
+          description: The maximum number of transactions to return.
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          description: The number of transactions to skip for pagination.
+          schema:
+            type: integer
+            default: 0
+        - name: accountId
+          in: query
+          description: Filter transactions by a specific account ID.
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          description: The start date for the filter (ISO 8601 format).
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          description: The end date for the filter (ISO 8601 format).
+          schema:
+            type: string
+            format: date
+        - name: category
+          in: query
+          description: Filter by Plaid's primary category (e.g., 'Transfer').
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A paginated list of transactions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  # --- Health Check ---
+  /health:
+    get:
+      tags:
+        - Health
+      summary: System Health Check
+      description: |-
+        A public, unauthenticated endpoint to verify that the API service is running.
+        Can be used by monitoring services.
+      operationId: getHealth
+      security: [] # No authentication required for this endpoint
+      responses:
+        "200":
+          description: The service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "OK"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+# ===============================================================================
+# COMPONENTS - Reusable schemas, parameters, and responses.
+# ===============================================================================
+components:
+  # --- Schemas (Data Models) ---
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique User ID from Auth0 (sub claim).
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        profileImageUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    PlaidItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The unique ID for the Plaid Item in our database.
+        plaidInstitutionId:
+          type: string
+          description: The stable institution ID from Plaid.
+        institutionName:
+          type: string
+          example: "Chase Bank"
+        syncStatus:
+          type: string
+          enum: [good, syncing, relink_required, error]
+          description: The current data synchronization status of the item.
+        lastSuccessfulSync:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the last successful data fetch.
+
+    PlaidItemWithAccounts:
+      allOf:
+        - $ref: '#/components/schemas/PlaidItem'
+        - type: object
+          properties:
+            accounts:
+              type: array
+              items:
+                $ref: '#/components/schemas/Account'
+
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The unique ID for the Account in our database.
+        plaidAccountId:
+          type: string
+          description: The unique account ID from Plaid.
+        name:
+          type: string
+          example: "Primary Checking"
+        mask:
+          type: string
+          example: "0766"
+        type:
+          type: string
+          enum: [depository, credit, loan, investment, other]
+          example: "depository"
+        subtype:
+          type: string
+          example: "checking"
+        currentBalance:
+          type: number
+          format: double
+          example: 1250.75
+        availableBalance:
+          type: number
+          format: double
+          nullable: true
+          example: 1200.50
+        currencyCode:
+          type: string
+          example: "USD"
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The unique ID for the transaction in our database.
+        plaidTransactionId:
+          type: string
+          description: The unique transaction ID from Plaid.
+        accountId:
+          type: string
+          description: The ID of the account this transaction belongs to.
+        amount:
+          type: number
+          format: double
+          description: Transaction amount. Negative for debits, positive for credits.
+          example: -12.50
+        currencyCode:
+          type: string
+          example: "USD"
+        date:
+          type: string
+          format: date
+          description: The date the transaction was posted.
+        merchantName:
+          type: string
+          nullable: true
+          example: "Starbucks"
+        primaryCategory:
+          type: string
+          nullable: true
+          example: "Food and Drink"
+        isPending:
+          type: boolean
+          description: True if the transaction is still pending.
+
+    Pagination:
+      type: object
+      properties:
+        offset:
+          type: integer
+          example: 0
+        limit:
+          type: integer
+          example: 25
+        total:
+          type: integer
+          example: 542
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "RESOURCE_NOT_FOUND"
+            message:
+              type: string
+              example: "The requested item with ID '123' was not found."
+
+  # --- Reusable Parameters ---
+  parameters:
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      description: The unique identifier of the Plaid Item (linked institution).
+      schema:
+        type: string
+
+  # --- Reusable Responses ---
+  responses:
+    BadRequest:
+      description: Bad Request. The request was malformed or contained invalid parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Unauthorized. The request requires authentication, but the token was missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: Forbidden. The authenticated user does not have permission to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Not Found. The requested resource could not be found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    TooManyRequests:
+      description: Rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InternalServerError:
+      description: Internal Server Error. An unexpected error occurred on the server.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+  # --- Security Schemes ---
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |-
+        JWT-based authentication. For web clients, the token is managed automatically via a secure, HttpOnly cookie.
+        For non-web clients, provide the token in the `Authorization` header: `Authorization: Bearer <JWT>`.
