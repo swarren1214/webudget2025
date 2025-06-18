@@ -4,7 +4,7 @@ services:
     build: ./server
     restart: unless-stopped
     env_file:
-      - ./server/.env
+      - ./.env
     ports:
       - "3000:3000"
   
@@ -12,6 +12,8 @@ services:
   db:
     image: postgres:15-alpine
     restart: unless-stopped
+    env_file:
+      - ./.env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -25,6 +27,8 @@ services:
   docs:
     image: swaggerapi/swagger-ui:v5.17.14
     restart: unless-stopped
+    env_file:
+      - ./.env
     ports:
       - "8080:8080"
     environment:

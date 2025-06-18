@@ -30,11 +30,14 @@ WORKDIR /usr/src/app
 # Copy package files again
 COPY package*.json ./
 
-# Install ONLY production dependencies
+# Install ONLY production dependencies (and node-pg-migrate)
 RUN npm install --only=production
 
 # Copy the compiled code from the 'builder' stage
 COPY --from=builder /usr/src/app/dist ./dist
+
+# Copy the top-level migrations folder
+COPY --from=builder /usr/src/app/migrations ./migrations
 
 # Expose the port the app runs on
 EXPOSE 3000
