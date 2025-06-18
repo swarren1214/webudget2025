@@ -104,7 +104,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlaidItem'
+                $ref: '#/components/schemas/Institution'
         "400":
           $ref: '#/components/responses/BadRequest'
         "401":
@@ -119,20 +119,36 @@ paths:
         - Institutions
       summary: Get All Institutions and their Accounts
       description: |-
-        Returns a list of all financial institutions for the authenticated user, with their nested accounts.
+        Returns a paginated list of all financial institutions for the authenticated user, with their nested accounts.
       operationId: getInstitutions
+      parameters:
+        - name: limit
+          in: query
+          description: The number of institutions to return.
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          description: The number of institutions to skip for pagination.
+          schema:
+            type: integer
+            default: 0
       responses:
         "200":
-          description: A list of the user's institutions, each containing their accounts.
+          description: A paginated list of the user's institutions, each containing their accounts.
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/PlaidItemWithAccounts'
+                      $ref: '#/components/schemas/InstitutionWithAccounts'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "500":
@@ -155,7 +171,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlaidItem'
+                $ref: '#/components/schemas/Institution'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -184,7 +200,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlaidItem'
+                $ref: '#/components/schemas/Institution'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -196,6 +212,48 @@ paths:
         "500":
           $ref: '#/components/responses/InternalServerError'
 
+  /institutions/{institutionId}/relink-token:
+    post:
+      tags:
+        - Institutions
+      summary: Create Relink Token
+      description: |-
+        Creates a new `link_token` for an existing Institution that is in an error state (e.g., `relink_required`).
+        This token is used to initialize Plaid Link in "update mode," allowing the user to re-authenticate their credentials
+        and fix the connection.
+      operationId: createRelinkToken
+      parameters:
+        - $ref: '#/components/parameters/InstitutionId'
+      responses:
+        "200":
+          description: Successfully created the link token for update mode.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  linkToken:
+                    type: string
+                    example: "link-sandbox-c8b1b0a7-a37e-405a-8b89-9b993302758f"
+                  expiration:
+                    type: string
+                    format: date-time
+                    example: "2025-06-18T14:05:00.000Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409": 
+          description: The institution is not in a state that requires relinking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
   # --- Transactions ---
   /transactions:
     get:
@@ -204,7 +262,7 @@ paths:
       summary: List All Transactions
       description: |-
         Returns a paginated list of all transactions for the authenticated user from all linked accounts.
-        Supports filtering by date range, account, and search query.
+        Supports filtering by date range, account(s), category, and search query.
       operationId: getTransactions
       parameters:
         - name: limit
@@ -218,10 +276,16 @@ paths:
           schema:
             type: integer
             default: 0
-        - name: accountId
+        - name: accountIds
           in: query
+          description: "A comma-separated list of account IDs to filter transactions by."
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+          example: "acct_55pp66oo77ii88uu99,acct_abc123def456"
         - name: startDate
           in: query
           schema:
@@ -234,10 +298,14 @@ paths:
             format: date
         - name: category
           in: query
+          description: |-
+            A string to filter transactions by category. This performs a case-insensitive search on Plaid's `detailedCategory`. To retrieve only internal transfers, use Plaid's official 'Transfer' category name.
           schema:
             type: string
+            example: "Restaurants"
         - name: searchText
           in: query
+          description: "A text string to search for in the transaction's merchant name and description."
           schema:
             type: string
       responses:
@@ -258,6 +326,58 @@ paths:
           $ref: '#/components/responses/BadRequest'
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  /transactions/{transactionId}:
+    patch:
+      tags:
+        - Transactions
+      summary: Update a Transaction
+      description: |-
+        Updates one or more properties of a specific transaction.
+        This is used to add user-defined notes or to re-categorize a transaction.
+        The user must be the owner of the account to which the transaction belongs.
+      operationId: updateTransaction
+      parameters:
+        - $ref: '#/components/parameters/TransactionId'
+      requestBody:
+        description: A JSON object containing only the fields to be updated.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  nullable: true
+                  description: "User-defined notes for the transaction. A null value will clear any existing notes."
+                  maxLength: 500
+                  example: "Split with Jane for dinner."
+                userCategoryId:
+                  type: string
+                  nullable: true
+                  description: "The ID of a user-defined category to override the one from Plaid. A null value will revert to Plaid's default category."
+                  pattern: "^cat_usr_[a-zA-Z0-9]+$"
+                  example: "cat_usr_9f8e7d6c5b4a"
+              additionalProperties: false
+              minProperties: 1
+      responses:
+        "200":
+          description: The transaction was updated successfully. The full, updated transaction is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
         "500":
           $ref: '#/components/responses/InternalServerError'
 
@@ -293,7 +413,7 @@ paths:
 components:
   # --- Schemas (Data Models) ---
   schemas:
-    PlaidItem:
+    Institution:
       type: object
       properties:
         id:
@@ -334,9 +454,9 @@ components:
           description: Timestamp when the institution was soft-deleted.
           example: "2025-06-18T10:00:00.000Z"
 
-    PlaidItemWithAccounts:
+    InstitutionWithAccounts:
       allOf:
-        - $ref: '#/components/schemas/PlaidItem'
+        - $ref: '#/components/schemas/Institution'
         - type: object
           properties:
             accounts:
@@ -489,6 +609,15 @@ components:
       schema:
         type: string
         example: "inst_11xxyy22zz33aabb44"
+
+    TransactionId:
+      name: transactionId
+      in: path
+      required: true
+      description: The unique identifier of the transaction.
+      schema:
+        type: string
+        example: "txn_ff66aa77bb88cc99dd"
 
   # --- Reusable Responses ---
   responses:
