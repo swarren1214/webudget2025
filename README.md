@@ -1,12 +1,6 @@
 # WeBudget - Personal Finance Management
 
-A full-stack personal finance management application designed to provide users with a consolidated view of their financial accounts.
-
-<!--
-[![Build Status](...)]()
-[![Code Coverage](...)]()
-[![License: MIT](...)]()
--->
+A full-stack personal finance management application designed to provide users with a consolidated view of their financial accounts, built with a focus on operational excellence and scalability.
 
 ---
 
@@ -19,23 +13,21 @@ A full-stack personal finance management application designed to provide users w
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Step 1: Configuration](#step-1-configuration)
-    - [**Step 2: Running the Application**](#step-2-running-the-application)
-    - [**Step 3: Database Initialization**](#step-3-database-initialization)
-  - [**API Documentation**](#api-documentation)
-  - [**Troubleshooting**](#troubleshooting)
-    - [**could not connect to postgres / password authentication failed**](#could-not-connect-to-postgres--password-authentication-failed)
+    - [Step 2: Launch \& Verification](#step-2-launch--verification)
+  - [Project Structure](#project-structure)
+  - [API Documentation](#api-documentation)
+  - [Advanced Operations](#advanced-operations)
+  - [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Project Overview
 
-The WeBudget monorepo contains the source code for the entire application suite, including the backend API (`/server`) and frontend client (`/client`). The backend is designed as a secure, scalable, and containerized RESTful API that serves as the single source of truth for all client applications.
+The WeBudget monorepo contains the source code for the entire application suite. The backend is a secure, containerized Node.js API that serves as the single source of truth for all client applications (web, mobile).
 
 ---
 
 ## Technology Stack
-
-The backend is built with a modern, containerized technology stack:
 
 -   **Runtime:** Node.js with TypeScript
 -   **Framework:** Express.js
@@ -48,63 +40,87 @@ The backend is built with a modern, containerized technology stack:
 
 ## Getting Started
 
-Follow these steps to set up and run the complete backend development environment. The entire stack is containerized, so no local installation of Node.js or PostgreSQL is required.
+Follow these steps to get the complete backend running locally. The entire stack is containerized, so no local installation of Node.js or PostgreSQL is required.
 
 ### Prerequisites
 
--   [Docker Desktop](https://www.docker.com/products/docker-desktop/) must be installed and running on your system.
+-   [**Docker Desktop**](https://www.docker.com/products/docker-desktop/): Must be installed and running.
+-   [**Git**](https://git-scm.com/): Required for cloning the repository.
 
 ### Step 1: Configuration
 
-This project uses a single `.env` file at the root of the project to manage all configuration for all services, ensuring credentials are never out of sync.
+This project uses a single `.env` file at the root of the project to manage all configuration and secrets.
 
-In the project's root directory (`webudget/`), create your `.env` file from the example:
+1.  **Clone the repository:**
+    ```bash
+    git clone <your-repository-url>
+    cd webudget
+    ```
 
-```bash
-cp .env.example .env
-```
+2.  **Create your local `.env` file from the template:**
+    ```bash
+    cp .env.example .env
+    ```
 
-Now, open the new .env file and fill in your secrets (Plaid keys, JWT secret, etc.).
+3.  **Edit the `.env` file** and fill in your secrets (Plaid keys, database password, etc.).
 
-### **Step 2: Running the Application**
+### Step 2: Launch & Verification
 
-Once your .env file is configured, launch the entire backend stack (API, Database, Docs Viewer) with a single command from the project root:
+Once your `.env` file is configured, launch the entire backend stack with a single command. **Database migrations will run automatically on startup.**
 
-```bash
-docker compose up --build
-```
+1.  **Launch the application:**
+    ```bash
+    docker-compose up --build
+    ```
+    This command builds the Docker images and starts the API, Database, and Docs containers. The `-d` flag can be added to run in detached (background) mode.
 
-The services will be available at the following local endpoints:
+2.  **Verify the services are running:**
+    * **Health Check:** Open your browser and navigate to `http://localhost:3000/health`. You should see a `{"status":"OK",...}` response.
+    * **API Docs:** Navigate to `http://localhost:8080` to see the interactive Swagger API documentation.
 
-* **API Server:** `http://localhost:3000`
-* **API Documentation:** `http://localhost:8080`
+---
 
-### **Step 3: Database Initialization**
+## Project Structure
 
-The first time you start the application, the database is created but its tables are not. Run the following command to execute the database migrations and build the schema:
+This is a monorepo containing multiple packages:
 
-```bash
-docker-compose exec api npm run migrate:up
-```
+-   `/server`: The Node.js backend API.
+-   `/client`: The React frontend application (or other clients).
+-   `/docs`: OpenAPI specifications and related documentation.
 
-You only need to run this command once after the initial setup, or anytime new migration files are added to the project.
+---
 
-## **API Documentation**
+## API Documentation
 
-Interactive API documentation is automatically generated and served by the docs service. You can access the live Swagger UI to view all endpoints and test them directly from your browser at:
+Interactive API documentation is automatically generated and served by the `docs` service. You can access the live Swagger UI to view all endpoints and test them directly from your browser at:
 
-* **URL:** `http://localhost:8080`
+-   **URL:** `http://localhost:8080`
 
-## **Troubleshooting**
+---
 
-### **could not connect to postgres / password authentication failed**
+## Advanced Operations
 
-This error indicates a problem with your .env file configuration.
+For detailed operational tasks such as connecting to the database, creating backups, and restoring data, please refer to the complete **[Deployment & Operations Guide](https://docs.google.com/document/d/1iUnlbMwTnSa1zSi8jWQZVOUL3rS9D93f6wgDG4iW0Qg/edit?tab=t.m0fxy3py2v37)**.
 
-**Solution:**
+---
 
-1. Stop and completely reset the environment by running the down command with the `-v` flag. This removes the containers AND the database volume: `docker compose down -v`  
-2. **Completely reset the database** by deleting the Docker volume: `docker volume rm webudget_postgres_data`  
-3. Carefully check your `.env` file for any typos, especially in the `DATABASE_URL` string.  
-4. Restart the application: `docker compose up --build`
-5. Run the migration again: `docker compose exec api npm run migrate:up`
+## Troubleshooting
+
+**Problem: The API is not responding or in a crash loop.**
+
+This is often caused by a misconfiguration in your `.env` file.
+
+1.  Check the container logs for specific error messages:
+    ```bash
+    docker-compose logs -f api
+    ```
+2.  If you see `password authentication failed`, your `DATABASE_URL` is likely incorrect.
+3.  To perform a clean reset, stop the containers and **delete the database volume**:
+    ```bash
+    # Warning: This command is destructive and will erase all data.
+    docker-compose down -v
+    ```
+4.  Carefully check your `.env` file for typos, then restart the application:
+    ```bash
+    docker-compose up --build
+    ```
