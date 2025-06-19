@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import apiV1Router from './api/routes';
 import pool from './config/database';
+import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics';
+import register from './metrics';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -17,6 +19,26 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 // Enable JSON body parsing
 app.use(express.json());
+
+app.use((req, res, next) => {
+  const end = httpRequestDurationSeconds.startTimer();
+
+  res.on('finish', () => {
+    const route = req.route ? req.route.path : req.originalUrl.split('?')[0];
+
+    const labels = {
+      method: req.method,
+      route: route,
+      code: res.statusCode.toString()
+    };
+
+    end(labels); // Record the duration
+    httpRequestsTotal.inc(labels); // Increment the counter
+  });
+
+  next();
+});
+
 
 // --- Health Check Endpoint ---
 app.get('/health', async (req: Request, res: Response) => {
@@ -41,6 +63,11 @@ app.get('/health', async (req: Request, res: Response) => {
     healthCheck.dependencies.database = 'UNAVAILABLE';
     res.status(503).json(healthCheck);
   }
+});
+
+app.get('/metrics', async (req: Request, res: Response) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
 });
 
 app.use('/api/v1', apiV1Router);

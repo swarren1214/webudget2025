@@ -168,6 +168,18 @@ To restore the database from a `.sql` file, all existing data will be dropped an
 cat webudget_backup_2025-06-18.sql | docker compose exec -T db psql -U myuser -d webudget_db
 ```
 
+### **Monitoring**
+
+The application exposes critical performance metrics in a Prometheus-compatible format. This allows for monitoring application health, performance, and error rates.
+
+#### **Accessing Metrics**
+
+The metrics endpoint is available at `GET /metrics`. You can view the raw output using `curl`:
+
+```bash
+curl http://localhost:3000/metrics
+```
+
 ## **6. Troubleshooting**
 
 ### **Problem: The API is not responding on** http://localhost:3000
