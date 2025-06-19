@@ -62,7 +62,54 @@ This project uses a single `.env` file at the root of the project to manage all 
     cp .env.example .env
     ```
 
-3.  **Edit the `.env` file** and fill in your secrets (Plaid keys, database password, etc.).
+3.  **Edit the `.env` file** and fill in your secrets (Plaid keys, database password, etc.):
+    * **`POSTGRES_PASSWORD`**
+
+      * **What it is: The password for your local PostgreSQL database that runs inside Docker.**  
+      * **How to get it: You create this yourself. Choose a secure, memorable password for your local development.**
+
+    * **`PLAID_CLIENT_ID`**
+
+      * **What it is: Your unique public identifier for the Plaid API.**  
+      * **How to get it:**  
+        1. **Go to the [Plaid Dashboard](https://dashboard.plaid.com/) and log in.**  
+        2. **Navigate to the Team Settings \-\> Keys section.**  
+        3. **You will see your `client_id` listed there. Copy and paste it.**
+
+    * **`PLAID_SECRET`**
+
+      * **What it is: Your private API key for a specific Plaid environment (Sandbox, Development, or Production). For our current work, we only need the Sandbox key.**  
+      * **How to get it:**  
+        1. **This is on the same Keys page in the Plaid Dashboard.**  
+        2. **Make sure you copy the secret for the Sandbox environment.**
+
+    * **`PLAID_ENV`**
+
+      * **What it is: Tells the Plaid SDK which environment to connect to.**  
+      * **How to get it: For all development and testing, this should be set to `sandbox`.**
+
+    * **`JWT_SECRET`**
+
+      * **What it is: A long, random, and secret string that our server will use to sign and verify JSON Web Tokens for user authentication. It must be kept private.**  
+      * **How to get it: You need to generate this yourself. A good way to create a strong, random secret is by using `openssl` in your terminal:**  
+
+```bash
+openssl rand -base64 32
+```
+
+      * **This will generate a random 32-byte string. Copy the output and paste it as the value for `JWT_SECRET`.**
+
+    * **`ENCRYPTION_KEY`**
+
+      * **What it is: A 32-byte (64-character hexadecimal) key used for encrypting and decrypting sensitive data, like the Plaid `access_token`, in our database.**  
+      * **How to get it: You must generate this yourself. It's critical that it's in the correct hex format. Use the following `openssl` command:**  
+
+```bash
+openssl rand -hex 32
+```
+
+      * **This will generate a random 64-character hex string. Copy and paste the output.**
+
 
 ### Step 2: Launch & Verification
 
