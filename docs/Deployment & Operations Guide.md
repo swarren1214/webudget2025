@@ -81,7 +81,9 @@ docker compose up --build
 
 Once the logs indicate the server has started, you can verify that everything is working correctly.
 
-1. **Check the Health Endpoint:** Open your web browser and navigate to http://localhost:3000/health. You should see a JSON response like: `{"status":"OK", ...}`.  
+1. **Check the Health Endpoint:** Open your web browser and navigate to http://localhost:3000/health. This endpoint performs a deep health check to verify both server and database connectivity.  
+    * A `200 OK` response with `{"status":"OK", ...}` indicates the API is running and can successfully communicate with the database.  
+    * A `503 Service Unavailable` response indicates a problem with the database connection, which helps orchestrators correctly manage traffic.
 2. **Check the API Docs:** Navigate to http://localhost:8080. The Swagger UI should load, displaying your API endpoints.
 
 If both checks pass, the backend is fully set up and running.
