@@ -67,15 +67,49 @@ Now, open the newly created `.env` file and populate it with the required values
 | `JWT_SECRET` | A long, random, secret string for signing JSON Web Tokens (JWTs). | **Generate a new secure secret.** |
 | `ENCRYPTION_KEY` | **Critical:** A 64-character hex key (32 bytes) for AES-256 encryption of Plaid tokens in the DB. | **Generate a new secure key.** Use the command: openssl rand -hex 32 |
 
-### **Step 3: Initial Application Launch**
+**Step 3: Database Migration and Application Launch**
 
-With the `.env` file configured, you can now launch the application. The startup process is fully automated: it will run database migrations first and then start the application server.
+ Database migrations are now managed separately from the application startup for safety and control. The process is now two distinct steps.
+
+ **First, run database migrations:** Use the `migrate` service to apply any pending schema changes to the database.
+
 
 ```bash
-docker compose up --build
+# This command starts the db, runs migrations, and then exits.
+docker compose run --rm migrate
 ```
 
-*This command will build the api image, start all services, and run database migrations automatically. You will see live logs in your terminal. There is no need for a separate migration command.*
+ **Second, launch the application:** With the database schema up to date, start the main application services.
+
+
+```bash
+# Start the api, docs, and db containers in the background
+docker compose up -d
+```
+
+ **Updating and Re-deploying**
+
+ When you pull new code, the process remains separate: first migrate, then deploy.
+
+```bash
+# 1. Pull new code
+git pull origin main
+
+# 2. Run migrations in case the schema has changed
+docker compose run --rm migrate
+
+# 3. Rebuild the image and restart the application
+docker compose up --build -d
+```
+
+ **Rolling Back a Migration (Advanced)**
+
+ To revert the most recent database migration, you can explicitly run the `migrate:down` command:
+
+
+```bash
+docker compose run --rm migrate npm run migrate:down
+```
 
 ### **Step 4: Verify Success**
 
