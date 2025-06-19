@@ -2,6 +2,9 @@
 
 import { createLinkToken, PlaidLinkTokenCreateFn } from './plaid.service';
 import { LinkTokenCreateResponse } from 'plaid';
+import { exchangePublicToken, EncryptFn, PlaidExchangeTokenFn, PlaidGetInstitutionFn } from './plaid.service';
+import { createPlaidItem, PlaidItem } from '../repositories/plaid.repository';
+import { Pool } from 'pg';
 
 describe('Plaid Service', () => {
 
@@ -66,6 +69,85 @@ describe('Plaid Service', () => {
 
             // We should also check that our failing mock was still called correctly.
             expect(mockPlaidClientFailure).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('exchangePublicToken', () => {
+        // --- Mock Dependencies ---
+        const mockPlaidExchangeResponse = { access_token: 'real-access-token', item_id: 'plaid-item-id-xyz', institution_id: 'ins_1' };
+        const mockPlaidInstitutionResponse = { institution: { name: 'Test Bank' } };
+        const mockEncryptedToken = 'encrypted-token-string';
+
+        // This is the fully defined mock object
+        const mockNewPlaidItem: PlaidItem = {
+            id: 1,
+            user_id: 'user-123',
+            plaid_item_id: 'plaid-item-id-xyz',
+            plaid_access_token: 'encrypted-token-string',
+            plaid_institution_id: 'ins_1',
+            institution_name: 'Test Bank',
+            sync_status: 'good',
+            last_successful_sync: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        const mockPlaidExchange: PlaidExchangeTokenFn = jest.fn().mockResolvedValue(mockPlaidExchangeResponse);
+        const mockPlaidGetInstitution: PlaidGetInstitutionFn = jest.fn().mockResolvedValue(mockPlaidInstitutionResponse);
+        const mockEncrypt: EncryptFn = jest.fn().mockReturnValue(mockEncryptedToken);
+        const mockCreatePlaidItem: jest.MockedFunction<typeof createPlaidItem> = jest.fn().mockResolvedValue(mockNewPlaidItem);
+
+        const mockDbClient = { release: jest.fn() };
+        const mockDbPool = { connect: jest.fn().mockResolvedValue(mockDbClient) } as unknown as Pool;
+
+        beforeEach(() => jest.clearAllMocks());
+
+        it('should correctly orchestrate token exchange, encryption, and item creation', async () => {
+            const userId = 'user-123';
+            const publicToken = 'public-token-abc';
+
+            const result = await exchangePublicToken(
+                mockDbPool,
+                mockPlaidExchange,
+                mockPlaidGetInstitution,
+                mockEncrypt,
+                mockCreatePlaidItem,
+                userId,
+                publicToken
+            );
+
+            expect(result).toEqual(mockNewPlaidItem);
+            expect(mockPlaidExchange).toHaveBeenCalledWith({ public_token: publicToken });
+            expect(mockPlaidGetInstitution).toHaveBeenCalledWith({ institution_id: 'ins_1', country_codes: ['US'] });
+            expect(mockEncrypt).toHaveBeenCalledWith('real-access-token');
+            expect(mockDbPool.connect).toHaveBeenCalledTimes(1);
+            expect(mockCreatePlaidItem).toHaveBeenCalledWith(mockDbClient, {
+                userId: userId,
+                encryptedAccessToken: mockEncryptedToken,
+                plaidItemId: 'plaid-item-id-xyz',
+                plaidInstitutionId: 'ins_1',
+                institutionName: 'Test Bank',
+            });
+            expect(mockDbClient.release).toHaveBeenCalledTimes(1);
+        });
+
+        it('should release the db client even if an error occurs', async () => {
+            const error = new Error('Plaid exchange failed');
+            (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(error);
+
+            await expect(
+                exchangePublicToken(
+                    mockDbPool,
+                    mockPlaidExchange,
+                    mockPlaidGetInstitution,
+                    mockEncrypt,
+                    mockCreatePlaidItem,
+                    'user-123',
+                    'public-token'
+                )
+            ).rejects.toThrow(error);
+
+            expect(mockDbClient.release).toHaveBeenCalledTimes(1);
         });
     });
 });
