@@ -1,5 +1,5 @@
 // server/src/services/health.service.ts
-import { checkConnection } from '../config/database';
+export type CheckDbConnectionFn = () => Promise<void>;
 
 export interface HealthStatus {
     status: 'OK' | 'UNAVAILABLE';
@@ -9,7 +9,9 @@ export interface HealthStatus {
     };
 }
 
-export const checkHealth = async (): Promise<HealthStatus> => {
+export const checkHealth = async (
+    checkDbConnection: CheckDbConnectionFn
+): Promise<HealthStatus> => {
     const healthCheck: HealthStatus = {
         status: 'OK',
         timestamp: new Date().toISOString(),
@@ -19,9 +21,8 @@ export const checkHealth = async (): Promise<HealthStatus> => {
     };
 
     try {
-        // The service now depends on our abstraction, not the low-level driver.
-        // The intent is clear: "check the connection".
-        await checkConnection();
+        // 3. Call the injected function.
+        await checkDbConnection();
     } catch (error) {
         healthCheck.status = 'UNAVAILABLE';
         healthCheck.dependencies.database = 'UNAVAILABLE';
