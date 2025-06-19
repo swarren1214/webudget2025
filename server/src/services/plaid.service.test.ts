@@ -1,8 +1,15 @@
 // server/src/services/plaid.service.test.ts
 
-import { createLinkToken, PlaidLinkTokenCreateFn } from './plaid.service';
-import { LinkTokenCreateResponse } from 'plaid';
-import { exchangePublicToken, EncryptFn, PlaidExchangeTokenFn, PlaidGetInstitutionFn } from './plaid.service';
+import { CountryCode, Products, LinkTokenCreateResponse } from 'plaid';
+import {
+    createLinkToken,
+    PlaidLinkTokenCreateFn,
+    exchangePublicToken,
+    EncryptFn,
+    PlaidExchangeTokenFn,
+    PlaidGetInstitutionFn,
+    PlaidItemGetFn
+} from './plaid.service';
 import { createPlaidItem, PlaidItem } from '../repositories/plaid.repository';
 import { Pool } from 'pg';
 
@@ -31,28 +38,22 @@ describe('Plaid Service', () => {
 
     describe('createLinkToken', () => {
         it('should return link token data on successful Plaid API call', async () => {
-            // --- ARRANGE ---
             const userId = 'user-123';
 
-            // --- ACT ---
-            // We call our service, injecting the mock that simulates a successful API call.
             const result = await createLinkToken(userId, mockPlaidClientSuccess);
 
-            // --- ASSERT ---
-            // 1. Check that the result from our service is what we expect.
             expect(result).toEqual({
                 linkToken: mockPlaidSuccessResponse.link_token,
                 expiration: mockPlaidSuccessResponse.expiration,
             });
 
-            // 2. Check that our mock dependency was called correctly.
             expect(mockPlaidClientSuccess).toHaveBeenCalledTimes(1);
             expect(mockPlaidClientSuccess).toHaveBeenCalledWith({
                 user: { client_user_id: userId },
                 client_name: 'WeBudget',
-                products: ['transactions'],
+                products: [Products.Transactions],
                 language: 'en',
-                country_codes: ['US'],
+                country_codes: [CountryCode.Us],
             });
         });
 
@@ -74,8 +75,22 @@ describe('Plaid Service', () => {
 
     describe('exchangePublicToken', () => {
         // --- Mock Dependencies ---
-        const mockPlaidExchangeResponse = { access_token: 'real-access-token', item_id: 'plaid-item-id-xyz', institution_id: 'ins_1' };
-        const mockPlaidInstitutionResponse = { institution: { name: 'Test Bank' } };
+        const mockPlaidExchangeResponse = {
+            access_token: 'real-access-token',
+            item_id: 'plaid-item-id-xyz'
+        };
+        const mockItemGetResponse = {
+            item: {
+                institution_id: 'ins_1'
+            }
+        };
+        const mockPlaidInstitutionResponse = {
+            institution: {
+                name: 'Test Bank'
+            }
+        };
+
+        // Add this line - it was missing!
         const mockEncryptedToken = 'encrypted-token-string';
 
         // This is the fully defined mock object
@@ -93,6 +108,7 @@ describe('Plaid Service', () => {
         };
 
         const mockPlaidExchange: PlaidExchangeTokenFn = jest.fn().mockResolvedValue(mockPlaidExchangeResponse);
+        const mockPlaidItemGet: PlaidItemGetFn = jest.fn().mockResolvedValue(mockItemGetResponse);
         const mockPlaidGetInstitution: PlaidGetInstitutionFn = jest.fn().mockResolvedValue(mockPlaidInstitutionResponse);
         const mockEncrypt: EncryptFn = jest.fn().mockReturnValue(mockEncryptedToken);
         const mockCreatePlaidItem: jest.MockedFunction<typeof createPlaidItem> = jest.fn().mockResolvedValue(mockNewPlaidItem);
@@ -102,6 +118,28 @@ describe('Plaid Service', () => {
 
         beforeEach(() => jest.clearAllMocks());
 
+        it('should not acquire a db client if Plaid exchange fails', async () => {
+            const error = new Error('Plaid exchange failed');
+            (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(error);
+
+            await expect(
+                exchangePublicToken(
+                    mockDbPool,
+                    mockPlaidExchange,
+                    mockPlaidItemGet,
+                    mockPlaidGetInstitution,
+                    mockEncrypt,
+                    mockCreatePlaidItem,
+                    'user-123',
+                    'public-token'
+                )
+            ).rejects.toThrow(error);
+
+            // The database connection should never be attempted
+            expect(mockDbPool.connect).not.toHaveBeenCalled();
+            expect(mockDbClient.release).not.toHaveBeenCalled();
+        });
+
         it('should correctly orchestrate token exchange, encryption, and item creation', async () => {
             const userId = 'user-123';
             const publicToken = 'public-token-abc';
@@ -109,6 +147,7 @@ describe('Plaid Service', () => {
             const result = await exchangePublicToken(
                 mockDbPool,
                 mockPlaidExchange,
+                mockPlaidItemGet,
                 mockPlaidGetInstitution,
                 mockEncrypt,
                 mockCreatePlaidItem,
@@ -118,7 +157,11 @@ describe('Plaid Service', () => {
 
             expect(result).toEqual(mockNewPlaidItem);
             expect(mockPlaidExchange).toHaveBeenCalledWith({ public_token: publicToken });
-            expect(mockPlaidGetInstitution).toHaveBeenCalledWith({ institution_id: 'ins_1', country_codes: ['US'] });
+            expect(mockPlaidItemGet).toHaveBeenCalledWith({ access_token: 'real-access-token' });
+            expect(mockPlaidGetInstitution).toHaveBeenCalledWith({
+                institution_id: 'ins_1',
+                country_codes: [CountryCode.Us]
+            });
             expect(mockEncrypt).toHaveBeenCalledWith('real-access-token');
             expect(mockDbPool.connect).toHaveBeenCalledTimes(1);
             expect(mockCreatePlaidItem).toHaveBeenCalledWith(mockDbClient, {
@@ -131,22 +174,25 @@ describe('Plaid Service', () => {
             expect(mockDbClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should release the db client even if an error occurs', async () => {
-            const error = new Error('Plaid exchange failed');
-            (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(error);
+        it('should release the db client even if database operation fails', async () => {
+            const dbError = new Error('Database operation failed');
+            (mockCreatePlaidItem as jest.Mock).mockRejectedValueOnce(dbError);
 
             await expect(
                 exchangePublicToken(
                     mockDbPool,
                     mockPlaidExchange,
+                    mockPlaidItemGet,
                     mockPlaidGetInstitution,
                     mockEncrypt,
                     mockCreatePlaidItem,
                     'user-123',
                     'public-token'
                 )
-            ).rejects.toThrow(error);
+            ).rejects.toThrow(dbError);
 
+            // The client should have been acquired and then released
+            expect(mockDbPool.connect).toHaveBeenCalledTimes(1);
             expect(mockDbClient.release).toHaveBeenCalledTimes(1);
         });
     });

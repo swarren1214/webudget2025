@@ -7,6 +7,7 @@ import logger from './logger';
 import pinoHttp from 'pino-http';
 import { randomUUID } from 'crypto';
 import mainRouter from './api/routes';
+import { errorHandler } from './middleware/error.middleware';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -54,6 +55,9 @@ app.use((req, res, next) => {
 
 // --- API Routes ---
 app.use('/', mainRouter);
+
+// IMPORTANT: Error handler must be the LAST middleware
+app.use(errorHandler);
 
 // --- Start the Server ---
 app.listen(port, () => {

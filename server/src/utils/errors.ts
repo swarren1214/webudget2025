@@ -27,3 +27,51 @@ export class UnauthorizedError extends ApiError {
         Object.setPrototypeOf(this, UnauthorizedError.prototype);
     }
 }
+
+export class ValidationError extends ApiError {
+    constructor(message = 'Validation failed', details?: any) {
+        super(message, 400);
+        this.details = details;
+        Object.setPrototypeOf(this, ValidationError.prototype);
+    }
+    public readonly details?: any;
+}
+
+export class NotFoundError extends ApiError {
+    constructor(message = 'Resource not found') {
+        super(message, 404);
+        Object.setPrototypeOf(this, NotFoundError.prototype);
+    }
+}
+
+export class ForbiddenError extends ApiError {
+    constructor(message = 'Access forbidden') {
+        super(message, 403);
+        Object.setPrototypeOf(this, ForbiddenError.prototype);
+    }
+}
+
+export class ConflictError extends ApiError {
+    constructor(message = 'Resource conflict') {
+        super(message, 409);
+        Object.setPrototypeOf(this, ConflictError.prototype);
+    }
+}
+
+export class TooManyRequestsError extends ApiError {
+    constructor(message = 'Too many requests') {
+        super(message, 429);
+        Object.setPrototypeOf(this, TooManyRequestsError.prototype);
+    }
+}
+
+// Map error names to error codes for API responses
+export const ERROR_CODES: Record<string, string> = {
+    ApiError: 'API_ERROR',
+    UnauthorizedError: 'UNAUTHORIZED',
+    ValidationError: 'VALIDATION_ERROR',
+    NotFoundError: 'NOT_FOUND',
+    ForbiddenError: 'FORBIDDEN',
+    ConflictError: 'CONFLICT',
+    TooManyRequestsError: 'TOO_MANY_REQUESTS',
+};

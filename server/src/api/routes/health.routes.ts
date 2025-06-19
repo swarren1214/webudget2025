@@ -1,10 +1,11 @@
 // server/src/api/routes/health.routes.ts
 import { Router } from 'express';
 import { getHealthStatus } from '../../controllers/health.controller';
+import { asyncHandler } from '../../middleware/error.middleware';
 
 const router = Router();
 
-// The health check endpoint should be at the root, e.g., GET /health
-router.get('/health', getHealthStatus);
+// Wrap with asyncHandler for extra safety
+router.get('/health', asyncHandler(getHealthStatus));
 
 export default router;
