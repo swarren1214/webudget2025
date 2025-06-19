@@ -25,6 +25,9 @@ export interface PlaidItem {
 }
 
 /**
+ * @deprecated Use PostgresPlaidItemRepository.create() instead
+ * This function will be removed in the next major version
+ * 
  * Creates a new Plaid item in the database.
  * This function now focuses ONLY on the data insertion logic.
  * Transaction management is handled by the caller.
