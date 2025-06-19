@@ -2,11 +2,12 @@
 
 import { Router } from 'express';
 import { createLinkTokenHandler } from '../../controllers/plaid.controller';
-// In a future step, we will add an authentication middleware here.
+import { authMiddleware } from '../../middleware/auth.middleware';
 
 const router = Router();
 
-// Defines the endpoint for POST /api/v1/plaid/create-link-token
-router.post('/create-link-token', createLinkTokenHandler);
+// The authMiddleware will now run before the createLinkTokenHandler.
+// If authentication fails, the request will never reach the controller.
+router.post('/create-link-token', authMiddleware, createLinkTokenHandler);
 
 export default router;
