@@ -2,13 +2,11 @@
 import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import apiV1Router from './api/routes';
-import healthRouter from './api/routes/health.routes';
 import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics';
-import register from './metrics';
 import logger from './logger';
 import pinoHttp from 'pino-http';
 import { randomUUID } from 'crypto';
+import mainRouter from './api/routes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -54,14 +52,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(healthRouter);
-
-app.get('/metrics', async (req: Request, res: Response) => {
-  res.set('Content-Type', register.contentType);
-  res.end(await register.metrics());
-});
-
-app.use('/api/v1', apiV1Router);
+// --- API Routes ---
+app.use('/', mainRouter);
 
 // --- Start the Server ---
 app.listen(port, () => {
