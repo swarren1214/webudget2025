@@ -5,30 +5,58 @@ import { createLinkToken, exchangePublicToken } from '../services/plaid.service'
 import plaidClient from '../config/plaid';
 import { encrypt } from '../utils/crypto';
 import dbPool from '../config/database';
-import { createPlaidItem } from '../repositories/plaid.repository';
+import { PostgresTransactionManager } from '../repositories/postgres-transaction.manager';
 import { UnauthorizedError, ValidationError } from '../utils/errors';
+import { AuthRequest } from '../middleware/auth.middleware';
+import {
+    LinkTokenCreateRequest,
+    LinkTokenCreateResponse,
+    ItemPublicTokenExchangeRequest,
+    ItemPublicTokenExchangeResponse,
+    ItemGetRequest,
+    ItemGetResponse,
+    InstitutionsGetByIdRequest,
+    InstitutionsGetByIdResponse
+} from 'plaid';
 
-interface AuthRequest extends Request {
-    user?: {
-        id: string;
-    };
-}
+// Create wrapper functions that extract the data from Axios responses
+const plaidLinkTokenCreate = async (request: LinkTokenCreateRequest): Promise<LinkTokenCreateResponse> => {
+    const response = await plaidClient.linkTokenCreate(request);
+    return response.data;
+};
+
+const plaidItemPublicTokenExchange = async (request: ItemPublicTokenExchangeRequest): Promise<ItemPublicTokenExchangeResponse> => {
+    const response = await plaidClient.itemPublicTokenExchange(request);
+    return response.data;
+};
+
+const plaidItemGet = async (request: ItemGetRequest): Promise<ItemGetResponse> => {
+    const response = await plaidClient.itemGet(request);
+    return response.data;
+};
+
+const plaidInstitutionsGetById = async (request: InstitutionsGetByIdRequest): Promise<InstitutionsGetByIdResponse> => {
+    const response = await plaidClient.institutionsGetById(request);
+    return response.data;
+};
+
+// Create a single instance of the transaction manager
+const transactionManager = new PostgresTransactionManager(dbPool);
 
 export const createLinkTokenHandler = async (
-    req: AuthRequest, 
-    res: Response, 
+    req: AuthRequest,
+    res: Response,
     next: NextFunction
 ): Promise<void> => {
     try {
-        // Throw errors instead of manually sending responses
         const userId = req.user?.id;
         if (!userId) {
             throw new UnauthorizedError('User not authenticated');
         }
 
         const tokenData = await createLinkToken(
-            userId, 
-            plaidClient.linkTokenCreate.bind(plaidClient)
+            userId,
+            plaidLinkTokenCreate // Use wrapper function
         );
 
         res.status(200).json(tokenData);
@@ -38,8 +66,8 @@ export const createLinkTokenHandler = async (
 };
 
 export const exchangePublicTokenHandler = async (
-    req: AuthRequest, 
-    res: Response, 
+    req: AuthRequest,
+    res: Response,
     next: NextFunction
 ): Promise<void> => {
     try {
@@ -54,12 +82,11 @@ export const exchangePublicTokenHandler = async (
         }
 
         const newItem = await exchangePublicToken(
-            dbPool,
-            plaidClient.itemPublicTokenExchange.bind(plaidClient),
-            plaidClient.itemGet.bind(plaidClient), // Add this line
-            plaidClient.institutionsGetById.bind(plaidClient),
+            transactionManager,
+            plaidItemPublicTokenExchange, // Use wrapper function
+            plaidItemGet, // Use wrapper function
+            plaidInstitutionsGetById, // Use wrapper function
             encrypt,
-            createPlaidItem,
             userId,
             publicToken
         );

@@ -4,7 +4,6 @@ import { PoolClient } from 'pg';
 import { createPlaidItem, PlaidItemToCreate } from './plaid.repository';
 
 describe('Plaid Repository', () => {
-    // Create a more complete mock
     let mockDbClient: Partial<PoolClient>;
 
     beforeEach(() => {
@@ -25,7 +24,7 @@ describe('Plaid Repository', () => {
         institutionName: 'Test Bank',
     };
 
-    it('should execute a transaction correctly on successful creation', async () => {
+    it('should create a plaid item successfully', async () => {
         // Mock the successful return value of the INSERT query
         const mockCreatedItem = {
             id: 1,
@@ -40,44 +39,40 @@ describe('Plaid Repository', () => {
             updated_at: new Date().toISOString()
         };
 
-        // Set up the mock responses in order
-        (mockDbClient.query as jest.Mock)
-            .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
-            .mockResolvedValueOnce({ rows: [mockCreatedItem], rowCount: 1 }) // INSERT
-            .mockResolvedValueOnce({ rows: [], rowCount: 0 }); // COMMIT
+        (mockDbClient.query as jest.Mock).mockResolvedValueOnce({
+            rows: [mockCreatedItem],
+            rowCount: 1
+        });
 
         const result = await createPlaidItem(mockDbClient as PoolClient, itemToCreate);
 
         // Check that the function returned the created item
         expect(result).toEqual(mockCreatedItem);
 
-        // Check that the SQL commands were called in the correct order
-        const queryCalls = (mockDbClient.query as jest.Mock).mock.calls;
-        expect(queryCalls[0][0]).toBe('BEGIN');
-        expect(queryCalls[1][0]).toContain('INSERT INTO plaid_items');
-        expect(queryCalls[2][0]).toBe('COMMIT');
-        expect(mockDbClient.query).toHaveBeenCalledTimes(3);
+        // Check that the INSERT query was called with correct parameters
+        expect(mockDbClient.query).toHaveBeenCalledTimes(1);
+        expect(mockDbClient.query).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO plaid_items'),
+            [
+                itemToCreate.userId,
+                itemToCreate.encryptedAccessToken,
+                itemToCreate.plaidItemId,
+                itemToCreate.plaidInstitutionId,
+                itemToCreate.institutionName,
+            ]
+        );
     });
 
-    it('should execute a ROLLBACK if an error occurs during the transaction', async () => {
-        // Simulate a database error on the INSERT query
+    it('should throw an error if the database query fails', async () => {
+        // Simulate a database error
         const dbError = new Error('Database error');
-
-        (mockDbClient.query as jest.Mock)
-            .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN succeeds
-            .mockRejectedValueOnce(dbError) // INSERT fails
-            .mockResolvedValueOnce({ rows: [], rowCount: 0 }); // ROLLBACK
+        (mockDbClient.query as jest.Mock).mockRejectedValueOnce(dbError);
 
         // Expect the createPlaidItem function to throw the error
         await expect(
             createPlaidItem(mockDbClient as PoolClient, itemToCreate)
         ).rejects.toThrow(dbError);
 
-        // Check that the transaction was started and then rolled back
-        const queryCalls = (mockDbClient.query as jest.Mock).mock.calls;
-        expect(queryCalls[0][0]).toBe('BEGIN');
-        expect(queryCalls[1][0]).toContain('INSERT INTO plaid_items');
-        expect(queryCalls[2][0]).toBe('ROLLBACK');
-        expect(mockDbClient.query).toHaveBeenCalledTimes(3);
+        expect(mockDbClient.query).toHaveBeenCalledTimes(1);
     });
 });

@@ -12,9 +12,9 @@ import {
     Products,
     CountryCode
 } from 'plaid';
-import { Pool } from 'pg';
 import { createPlaidItem, PlaidItem, PlaidItemToCreate } from '../repositories/plaid.repository';
 import { ApiError } from '../utils/errors';
+import { TransactionManager } from '../repositories/transaction.manager';
 
 /**
  * This is the abstraction for the Plaid client's linkTokenCreate method.
@@ -78,13 +78,11 @@ export type PlaidItemGetFn = (
 
 export type EncryptFn = (text: string) => string;
 
-type CreatePlaidItemFn = typeof createPlaidItem;
 
 /**
  * Exchanges a public token for an access token, encrypts it,
  * and creates a new Plaid item in the database.
  *
- * @param {Pool} dbPool - The main 'pg' pool to get a client from.
  * @param {PlaidExchangeTokenFn} plaidExchangeToken - Function to call Plaid's exchange token endpoint.
  * @param {PlaidGetInstitutionFn} plaidGetInstitution - Function to call Plaid's get institution endpoint.
  * @param {EncryptFn} encrypt - Function to encrypt the access token.
@@ -94,16 +92,15 @@ type CreatePlaidItemFn = typeof createPlaidItem;
  * @returns {Promise<PlaidItem>} The newly created Plaid item.
  */
 export const exchangePublicToken = async (
-    dbPool: Pool,
+    transactionManager: TransactionManager,  // Changed from Pool
     plaidExchangeToken: PlaidExchangeTokenFn,
-    plaidItemGet: PlaidItemGetFn,  // Add this parameter
+    plaidItemGet: PlaidItemGetFn,
     plaidGetInstitution: PlaidGetInstitutionFn,
     encrypt: EncryptFn,
-    createPlaidItemInDb: CreatePlaidItemFn,
     userId: string,
     publicToken: string,
 ): Promise<PlaidItem> => {
-    // 1. Exchange the public token for an access token from Plaid.
+    // 1. Exchange the public token for an access token from Plaid
     const exchangeResponse = await plaidExchangeToken({ public_token: publicToken });
     const accessToken = exchangeResponse.access_token;
     const itemId = exchangeResponse.item_id;
@@ -123,10 +120,10 @@ export const exchangePublicToken = async (
     });
     const institutionName = institutionResponse.institution.name;
 
-    // 4. Encrypt the access token before storing it.
+    // 4. Encrypt the access token before storing it
     const encryptedAccessToken = encrypt(accessToken);
 
-    // 5. Prepare the data for the repository.
+    // 5. Prepare the data for the repository
     const itemToCreate: PlaidItemToCreate = {
         userId,
         encryptedAccessToken,
@@ -135,12 +132,14 @@ export const exchangePublicToken = async (
         institutionName,
     };
 
-    // 6. Get a client from the pool and save the item using the repository.
-    const dbClient = await dbPool.connect();
-    try {
-        const newItem = await createPlaidItemInDb(dbClient, itemToCreate);
+    // 6. Use transaction manager to handle the database operation
+    return transactionManager.executeInTransaction(async (client) => {
+        // Create the Plaid item
+        const newItem = await createPlaidItem(client, itemToCreate);
+
+        // Future: Queue the background job
+        // await createBackgroundJob(client, 'INITIAL_SYNC', { item_id: newItem.id });
+
         return newItem;
-    } finally {
-        dbClient.release();
-    }
-};
+    });
+}

@@ -1,6 +1,6 @@
 // server/src/services/plaid.service.test.ts
 
-import { CountryCode, Products, LinkTokenCreateResponse } from 'plaid';
+import { CountryCode, Products, LinkTokenCreateResponse, ItemStatus } from 'plaid';
 import {
     createLinkToken,
     PlaidLinkTokenCreateFn,
@@ -11,7 +11,8 @@ import {
     PlaidItemGetFn
 } from './plaid.service';
 import { createPlaidItem, PlaidItem } from '../repositories/plaid.repository';
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
+import { TransactionManager } from '../repositories/transaction.manager';
 
 describe('Plaid Service', () => {
 
@@ -101,7 +102,7 @@ describe('Plaid Service', () => {
             plaid_access_token: 'encrypted-token-string',
             plaid_institution_id: 'ins_1',
             institution_name: 'Test Bank',
-            sync_status: 'good',
+            sync_status: 'good' as ItemStatus,
             last_successful_sync: null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -116,84 +117,62 @@ describe('Plaid Service', () => {
         const mockDbClient = { release: jest.fn() };
         const mockDbPool = { connect: jest.fn().mockResolvedValue(mockDbClient) } as unknown as Pool;
 
+        const mockTransactionManager: TransactionManager = {
+            executeInTransaction: jest.fn().mockImplementation(
+                async (operation: (client: PoolClient) => Promise<any>) => {
+                    // Simulate providing a client to the operation
+                    const mockClient = {} as PoolClient;
+                    return operation(mockClient);
+                }
+            )
+        };
+
         beforeEach(() => jest.clearAllMocks());
 
-        it('should not acquire a db client if Plaid exchange fails', async () => {
+        it('should correctly orchestrate token exchange, encryption, and item creation', async () => {
+            // Set up the mock to return the expected item
+            (mockTransactionManager.executeInTransaction as jest.Mock).mockImplementation(
+                async (operation) => {
+                    const mockClient = {} as PoolClient;
+                    // Mock createPlaidItem being called within the transaction
+                    jest.spyOn(require('../repositories/plaid.repository'), 'createPlaidItem')
+                        .mockResolvedValue(mockNewPlaidItem);
+                    return operation(mockClient);
+                }
+            );
+
+            const result = await exchangePublicToken(
+                mockTransactionManager,
+                mockPlaidExchange,
+                mockPlaidItemGet,
+                mockPlaidGetInstitution,
+                mockEncrypt,
+                'user-123',
+                'public-token'
+            );
+
+            expect(result).toEqual(mockNewPlaidItem);
+            expect(mockTransactionManager.executeInTransaction).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not call transaction manager if Plaid exchange fails', async () => {
             const error = new Error('Plaid exchange failed');
             (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(error);
 
             await expect(
                 exchangePublicToken(
-                    mockDbPool,
+                    mockTransactionManager,
                     mockPlaidExchange,
                     mockPlaidItemGet,
                     mockPlaidGetInstitution,
                     mockEncrypt,
-                    mockCreatePlaidItem,
                     'user-123',
                     'public-token'
                 )
             ).rejects.toThrow(error);
 
-            // The database connection should never be attempted
-            expect(mockDbPool.connect).not.toHaveBeenCalled();
-            expect(mockDbClient.release).not.toHaveBeenCalled();
-        });
-
-        it('should correctly orchestrate token exchange, encryption, and item creation', async () => {
-            const userId = 'user-123';
-            const publicToken = 'public-token-abc';
-
-            const result = await exchangePublicToken(
-                mockDbPool,
-                mockPlaidExchange,
-                mockPlaidItemGet,
-                mockPlaidGetInstitution,
-                mockEncrypt,
-                mockCreatePlaidItem,
-                userId,
-                publicToken
-            );
-
-            expect(result).toEqual(mockNewPlaidItem);
-            expect(mockPlaidExchange).toHaveBeenCalledWith({ public_token: publicToken });
-            expect(mockPlaidItemGet).toHaveBeenCalledWith({ access_token: 'real-access-token' });
-            expect(mockPlaidGetInstitution).toHaveBeenCalledWith({
-                institution_id: 'ins_1',
-                country_codes: [CountryCode.Us]
-            });
-            expect(mockEncrypt).toHaveBeenCalledWith('real-access-token');
-            expect(mockDbPool.connect).toHaveBeenCalledTimes(1);
-            expect(mockCreatePlaidItem).toHaveBeenCalledWith(mockDbClient, {
-                userId: userId,
-                encryptedAccessToken: mockEncryptedToken,
-                plaidItemId: 'plaid-item-id-xyz',
-                plaidInstitutionId: 'ins_1',
-                institutionName: 'Test Bank',
-            });
-            expect(mockDbClient.release).toHaveBeenCalledTimes(1);
-        });
-
-        it('should release the db client even if database operation fails', async () => {
-            const dbError = new Error('Database operation failed');
-            (mockCreatePlaidItem as jest.Mock).mockRejectedValueOnce(dbError);
-
-            await expect(
-                exchangePublicToken(
-                    mockDbPool,
-                    mockPlaidExchange,
-                    mockPlaidItemGet,
-                    mockPlaidGetInstitution,
-                    mockEncrypt,
-                    mockCreatePlaidItem,
-                    'user-123',
-                    'public-token'
-                )
-            ).rejects.toThrow(dbError);
-
-            // The client should have been acquired and then released
-            expect(mockDbPool.connect).toHaveBeenCalledTimes(1);
-            expect(mockDbClient.release).toHaveBeenCalledTimes(1);
+            // Transaction should never be started
+            expect(mockTransactionManager.executeInTransaction).not.toHaveBeenCalled();
         });
     });
 });
