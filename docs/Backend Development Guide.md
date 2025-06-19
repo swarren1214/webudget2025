@@ -104,7 +104,69 @@ Our backend follows a layered architecture to ensure a clear separation of conce
 
 ### **5.1 Dependency Management & Injection**
 
-To ensure our components are decoupled and testable, we will use **Dependency Injection**. Services should not create their own dependencies (e.g., `new TransactionRepository()`). Instead, dependencies should be passed into the service's functions or constructor. This allows us to "inject" mock dependencies during testing and makes the code's structure transparent.
+To ensure our components are decoupled and highly testable, we will use a clear and consistent **Dependency Injection** pattern. Services must remain completely independent of concrete implementations (like specific database clients or third-party SDKs).
+
+The responsibility for "wiring up" the application—connecting the abstract business logic to the concrete tools that do the work—lies in the **Controller layer**.
+
+#### **Our Dependency Injection Pattern:**
+
+1. **Services Define Abstractions:** A service must never directly import a concrete data-access function or external client. Instead, it must define its dependencies as an **abstraction** (typically a TypeScript `type` or `interface` for a function signature). It then accepts this dependency as an argument to its function.  
+   *Example (`*.service.ts`):*
+
+```ts
+// Define the dependency's "shape"
+export type FindUserByIdFn = (id: string) => Promise<User | null>;
+
+// The service accepts the dependency as an argument
+export const getUserProfile = async (
+    userId: string,
+    findUserById: FindUserByIdFn
+): Promise<UserProfile> => {
+    const user = await findUserById(userId);
+    // ... business logic
+};
+```
+
+2.   
+   **Controllers Inject Concrete Implementations:** The controller is responsible for importing the concrete functions (e.g., from a repository or a config file) and **injecting** them when it calls the service.  
+   *Example (`*.controller.ts`):*
+
+```ts
+import { getUserProfile } from '../services/user.service';
+// The controller imports the *real* implementation
+import { findUserByIdFromDb } from '../repositories/user.repository';
+
+export const getUserProfileHandler = async (req: Request, res: Response) => {
+    const userId = req.user.id;
+
+    // It "injects" the concrete function into the service
+    const userProfile = await getUserProfile(userId, findUserByIdFromDb);
+
+    res.status(200).json(userProfile);
+};
+```
+
+3.   
+   **Mocking in Tests:** This pattern makes unit testing services trivial. There is no need to use `jest.mock()` to intercept module imports. Instead, you create simple mock functions in your test file and pass them directly to the service.  
+   *Example (`*.service.test.ts`):*
+
+```ts
+import { getUserProfile, FindUserByIdFn } from './user.service';
+
+it('should process a found user', async () => {
+    // Create a simple mock that fulfills the dependency's contract
+    const mockFindUser: FindUserByIdFn = jest.fn().mockResolvedValue({ id: '123', name: 'Test User' });
+
+    // Pass the mock directly into the service function
+    const profile = await getUserProfile('123', mockFindUser);
+
+    expect(mockFindUser).toHaveBeenCalledWith('123');
+    expect(profile).toBeDefined();
+});
+```
+
+By strictly following this pattern, we guarantee that our business logic is always decoupled, easy to reason about, and simple to test.
+
 
 ## **6. Directory Structure**
 
@@ -156,7 +218,7 @@ Consistent error handling is crucial for a reliable API.
 * **Handling:** A global error-handling middleware will be responsible for catching all errors, logging them, and sending a standardized JSON error response to the client based on the type of error thrown.  
 * **Standard Error Shape:** All error responses must conform to the following structure:
 
-```
+```json
 {
   "error": {
     "code": "RESOURCE_NOT_FOUND",
