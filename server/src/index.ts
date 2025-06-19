@@ -6,6 +6,9 @@ import apiV1Router from './api/routes';
 import pool from './config/database';
 import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics';
 import register from './metrics';
+import logger from './logger';
+import pinoHttp from 'pino-http';
+import { randomUUID } from 'crypto';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -13,6 +16,18 @@ dotenv.config();
 // Initialize the Express application
 const app: Express = express();
 const port = process.env.PORT || 3000;
+
+app.use(pinoHttp({
+  logger,
+  // Define a custom request ID header
+  genReqId: function (req, res) {
+    const existingId = req.id ?? req.headers["x-request-id"];
+    if (existingId) return existingId;
+    const id = randomUUID();
+    res.setHeader('X-Request-Id', id);
+    return id;
+  },
+}));
 
 // --- Global Middleware ---
 // Enable Cross-Origin Resource Sharing
@@ -39,7 +54,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 // --- Health Check Endpoint ---
 app.get('/health', async (req: Request, res: Response) => {
   const healthCheck = {
@@ -54,10 +68,11 @@ app.get('/health', async (req: Request, res: Response) => {
     // The 'pg' library's pool.query method is efficient.
     // It will check out a client, run the query, and release it automatically.
     await pool.query('SELECT 1');
+    req.log.info('Health check successful');
     res.status(200).json(healthCheck);
   } catch (error) {
     // Log the actual error for debugging
-    console.error('Health check failed:', error);
+    req.log.error({ err: error }, 'Health check failed due to database error.');
 
     healthCheck.status = 'UNAVAILABLE';
     healthCheck.dependencies.database = 'UNAVAILABLE';
@@ -74,5 +89,5 @@ app.use('/api/v1', apiV1Router);
 
 // --- Start the Server ---
 app.listen(port, () => {
-  console.log(`[server]: Server is running at http://localhost:${port}`);
+  logger.info(`[server]: Server is running at http://localhost:${port}`);
 });

@@ -114,7 +114,10 @@ docker compose down
 
 ### **Viewing Logs**
 
-To view the real-time logs from a running container (essential for troubleshooting):
+The application produces structured JSON logs for all operations, which is ideal for production monitoring systems. For local development, logs are automatically "pretty-printed" for readability.
+
+To view the real-time logs from a running container:
+
 
 ```bash
 # Follow the logs from the API server  
