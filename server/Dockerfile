@@ -39,8 +39,17 @@ COPY --from=builder /usr/src/app/dist ./dist
 # Copy the top-level migrations folder
 COPY --from=builder /usr/src/app/migrations ./migrations
 
+# Copy the entrypoint script into the container's filesystem
+COPY entrypoint.sh .
+
+# Make the script executable
+RUN chmod +x ./entrypoint.sh
+
 # Expose the port the app runs on
 EXPOSE 3000
 
-# The command to run the application
+# 3. Set the entrypoint script as the container's entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
+
+# 4. Set the default command to be passed to the entrypoint
 CMD [ "node", "dist/index.js" ]
