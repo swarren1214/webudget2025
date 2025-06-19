@@ -3,7 +3,7 @@ import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import apiV1Router from './api/routes';
-import pool from './config/database';
+import healthRouter from './api/routes/health.routes';
 import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics';
 import register from './metrics';
 import logger from './logger';
@@ -54,31 +54,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- Health Check Endpoint ---
-app.get('/health', async (req: Request, res: Response) => {
-  const healthCheck = {
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    dependencies: {
-      database: 'OK',
-    },
-  };
-
-  try {
-    // The 'pg' library's pool.query method is efficient.
-    // It will check out a client, run the query, and release it automatically.
-    await pool.query('SELECT 1');
-    req.log.info('Health check successful');
-    res.status(200).json(healthCheck);
-  } catch (error) {
-    // Log the actual error for debugging
-    req.log.error({ err: error }, 'Health check failed due to database error.');
-
-    healthCheck.status = 'UNAVAILABLE';
-    healthCheck.dependencies.database = 'UNAVAILABLE';
-    res.status(503).json(healthCheck);
-  }
-});
+app.use(healthRouter);
 
 app.get('/metrics', async (req: Request, res: Response) => {
   res.set('Content-Type', register.contentType);
