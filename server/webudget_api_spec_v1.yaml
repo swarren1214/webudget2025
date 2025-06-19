@@ -305,7 +305,7 @@ paths:
             example: "Restaurants"
         - name: searchText
           in: query
-          description: "A text string to search for in the transaction's merchant name and description."
+          description: "A text string to perform a case-insensitive search across the transaction's **merchant name** and **detailed category** fields."
           schema:
             type: string
       responses:
