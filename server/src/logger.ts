@@ -1,5 +1,6 @@
 // src/logger.ts
 import pino from 'pino';
+import config from './config/env';
 
 // Define the paths to redact from logs, based on the Architecture Design Document.
 // This is a security best practice to prevent leaking PII.
@@ -18,12 +19,12 @@ const redactPaths = [
 ];
 
 const logger = pino({
-    level: process.env.LOG_LEVEL || 'info',
-    transport: process.env.NODE_ENV !== 'production' ? {
-      target: 'pino-pretty',
-      options: {
-        colorize: true
-      }
+    level: config.LOG_LEVEL,
+    transport: config.NODE_ENV !== 'production' ? {
+        target: 'pino-pretty',
+        options: {
+            colorize: true
+        }
     } : undefined,
     redact: {
         paths: redactPaths,

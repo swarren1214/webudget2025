@@ -1,6 +1,6 @@
 // src/index.ts
+import config from './config/env'; // This MUST be the first import
 import express, { Express, Request, Response } from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics';
 import logger from './logger';
@@ -9,12 +9,9 @@ import { randomUUID } from 'crypto';
 import mainRouter from './api/routes';
 import { errorHandler } from './middleware/error.middleware';
 
-// Load environment variables from .env file
-dotenv.config();
-
 // Initialize the Express application
 const app: Express = express();
-const port = process.env.PORT || 3000;
+const port = config.PORT;
 
 app.use(pinoHttp({
   logger,

@@ -3,12 +3,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
 import { UnauthorizedError } from '../utils/errors';
-
-const { JWT_SECRET } = process.env;
-
-if (!JWT_SECRET) {
-    throw new Error('FATAL_ERROR: JWT_SECRET is not defined.');
-}
+import config from '../config/env';
 
 interface JwtPayload {
     sub: string;
@@ -35,7 +30,7 @@ export const authMiddleware = (
         }
 
         const token = authHeader.split(' ')[1];
-        const decoded = verify(token, JWT_SECRET) as JwtPayload;
+        const decoded = verify(token, config.JWT_SECRET) as JwtPayload;
 
         // Cast to AuthRequest when setting user
         (req as AuthRequest).user = { id: decoded.sub };

@@ -1,7 +1,5 @@
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import config from './env';
 
 const { PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV } = process.env;
 
@@ -18,11 +16,11 @@ if (!PlaidEnvironments[plaidEnv]) {
 }
 
 const configuration = new Configuration({
-    basePath: PlaidEnvironments[plaidEnv],
+    basePath: PlaidEnvironments[config.PLAID_ENV],
     baseOptions: {
         headers: {
-            'PLAID-CLIENT-ID': PLAID_CLIENT_ID,
-            'PLAID-SECRET': PLAID_SECRET,
+            'PLAID-CLIENT-ID': config.PLAID_CLIENT_ID,
+            'PLAID-SECRET': config.PLAID_SECRET,
         },
     },
 });

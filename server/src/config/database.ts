@@ -1,11 +1,9 @@
 // server/src/config/database.ts
 import { Pool } from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import config from './env';
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: config.DATABASE_URL,
 });
 
 /**
