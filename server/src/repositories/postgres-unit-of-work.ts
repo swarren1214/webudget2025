@@ -8,47 +8,14 @@ import { PostgresPlaidItemRepository } from './postgres-plaid-item.repository';
 import { PostgresBackgroundJobRepository } from './postgres-background-job.repository';
 import logger from '../logger';
 
-/**
- * Transaction-scoped repositories that share the same database connection
- */
-class TransactionScopedRepositories {
-    public readonly plaidItems: PlaidItemRepository;
-    public readonly backgroundJobs: BackgroundJobRepository;
-
-    constructor(client: PoolClient) {
-        // Create a transaction manager that uses the specific client
-        const clientTransactionManager = {
-            executeInTransaction: async <T>(operation: (client: PoolClient) => Promise<T>): Promise<T> => {
-                // Don't start a new transaction, use the existing client
-                return operation(client);
-            }
-        };
-
-        this.plaidItems = new PostgresPlaidItemRepository(clientTransactionManager);
-        this.backgroundJobs = new PostgresBackgroundJobRepository(clientTransactionManager);
-    }
-}
-
 export class PostgresUnitOfWork implements UnitOfWork {
+    public plaidItems!: PlaidItemRepository;
+    public backgroundJobs!: BackgroundJobRepository;
+
     private client?: PoolClient;
-    private repositories?: TransactionScopedRepositories;
     private isTransactionActive = false;
 
     constructor(private pool: Pool) { }
-
-    get plaidItems(): PlaidItemRepository {
-        if (!this.repositories) {
-            throw new Error('No active transaction. Call executeTransaction first.');
-        }
-        return this.repositories.plaidItems;
-    }
-
-    get backgroundJobs(): BackgroundJobRepository {
-        if (!this.repositories) {
-            throw new Error('No active transaction. Call executeTransaction first.');
-        }
-        return this.repositories.backgroundJobs;
-    }
 
     async executeTransaction<T>(operation: () => Promise<T>): Promise<T> {
         if (this.isTransactionActive) {
@@ -56,13 +23,14 @@ export class PostgresUnitOfWork implements UnitOfWork {
         }
 
         this.client = await this.pool.connect();
-        this.repositories = new TransactionScopedRepositories(this.client);
+        // Instantiate repositories with the single transactional client
+        this.plaidItems = new PostgresPlaidItemRepository(this.client);
+        this.backgroundJobs = new PostgresBackgroundJobRepository(this.client);
         this.isTransactionActive = true;
-
+        
         try {
             await this.client.query('BEGIN');
             logger.debug('Transaction started');
-
             const result = await operation();
 
             await this.client.query('COMMIT');
@@ -77,11 +45,12 @@ export class PostgresUnitOfWork implements UnitOfWork {
         }
     }
 
+    // Note: commit and rollback are now primarily for internal use by executeTransaction,
+    // but are kept to satisfy the interface if manual transaction control were ever needed.
     async commit(): Promise<void> {
         if (!this.client || !this.isTransactionActive) {
             throw new Error('No active transaction to commit');
         }
-
         await this.client.query('COMMIT');
         logger.debug('Transaction manually committed');
     }
@@ -90,7 +59,6 @@ export class PostgresUnitOfWork implements UnitOfWork {
         if (!this.client) {
             return;
         }
-
         try {
             await this.client.query('ROLLBACK');
             logger.debug('Transaction rolled back');
@@ -104,7 +72,9 @@ export class PostgresUnitOfWork implements UnitOfWork {
             this.client.release();
             this.client = undefined;
         }
-        this.repositories = undefined;
+        // Clear repository instances
+        this.plaidItems = undefined as any;
+        this.backgroundJobs = undefined as any;
         this.isTransactionActive = false;
     }
 }

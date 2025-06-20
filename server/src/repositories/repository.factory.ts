@@ -1,8 +1,6 @@
 // server/src/repositories/repository.factory.ts
 
 import { Pool } from 'pg';
-import { TransactionManager } from './transaction.manager';
-import { PostgresTransactionManager } from './postgres-transaction.manager';
 import { PlaidItemRepository } from './interfaces/plaid-item.repository.interface';
 import { BackgroundJobRepository } from './interfaces/background-job.repository.interface';
 import { UnitOfWork } from './interfaces/unit-of-work.interface';
@@ -11,18 +9,13 @@ import { PostgresBackgroundJobRepository } from './postgres-background-job.repos
 import { PostgresUnitOfWork } from './postgres-unit-of-work';
 
 export class RepositoryFactory {
-    private transactionManager: TransactionManager;
     private plaidItemRepository: PlaidItemRepository;
     private backgroundJobRepository: BackgroundJobRepository;
 
     constructor(private pool: Pool) {
-        this.transactionManager = new PostgresTransactionManager(pool);
-        this.plaidItemRepository = new PostgresPlaidItemRepository(this.transactionManager);
-        this.backgroundJobRepository = new PostgresBackgroundJobRepository(this.transactionManager);
-    }
-
-    getTransactionManager(): TransactionManager {
-        return this.transactionManager;
+        // Instantiate repositories with the main pool for non-transactional, single queries.
+        this.plaidItemRepository = new PostgresPlaidItemRepository(this.pool);
+        this.backgroundJobRepository = new PostgresBackgroundJobRepository(this.pool);
     }
 
     getPlaidItemRepository(): PlaidItemRepository {
@@ -40,7 +33,6 @@ export class RepositoryFactory {
 
 // Create a singleton instance
 let repositoryFactory: RepositoryFactory | null = null;
-
 export function getRepositoryFactory(pool: Pool): RepositoryFactory {
     if (!repositoryFactory) {
         repositoryFactory = new RepositoryFactory(pool);
