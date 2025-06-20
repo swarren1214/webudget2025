@@ -7,6 +7,7 @@ const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-dev-secret';
 import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
 import { UnauthorizedError } from '../utils/errors';
+import config from '../config/env';
 
 // const { JWT_SECRET } = process.env;
 //
@@ -40,7 +41,7 @@ export const authMiddleware = (
 
         const token = authHeader.split(' ')[1];
         // JWT_SECRET is not defined; this middleware is deprecated if using Auth0 only.
-        // const decoded = verify(token, JWT_SECRET) as JwtPayload;
+        // const decoded = verify(token, config.JWT_SECRET) as JwtPayload;
         throw new UnauthorizedError('JWT authentication is disabled. Use Auth0.');
 
         // Cast to AuthRequest when setting user
