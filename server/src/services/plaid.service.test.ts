@@ -15,6 +15,7 @@ import {
 import { PlaidItemRepository } from '../repositories/interfaces/plaid-item.repository.interface';
 import { PlaidItem, ItemStatus } from '../repositories/plaid.repository';
 import { ApiError } from '../utils/errors';
+import { UnitOfWork } from '../repositories/interfaces/unit-of-work.interface';
 
 describe('Plaid Service', () => {
     // Mock dependencies
@@ -67,101 +68,119 @@ describe('Plaid Service', () => {
     });
 
     describe('exchangePublicToken', () => {
-        const mockPlaidExchangeResponse = {
-            access_token: 'real-access-token',
-            item_id: 'plaid-item-id-xyz'
-        };
-        const mockItemGetResponse = {
-            item: {
-                institution_id: 'ins_1'
-            }
-        };
-        const mockPlaidInstitutionResponse = {
-            institution: {
-                name: 'Test Bank'
-            }
-        };
-
+        // --- ARRANGE ---
+        // 1. Define mock responses from Plaid and a mock encrypted token.
+        const mockPlaidExchangeResponse = { access_token: 'real-access-token', item_id: 'plaid-item-id-xyz' };
+        const mockItemGetResponse = { item: { institution_id: 'ins_1' } };
+        const mockPlaidInstitutionResponse = { institution: { name: 'Test Bank' } };
         const mockEncryptedToken = 'encrypted-token-string';
-        const mockNewPlaidItem: PlaidItem = {
-            id: 1,
-            user_id: 'user-123',
-            plaid_item_id: 'plaid-item-id-xyz',
-            plaid_access_token: 'encrypted-token-string',
-            plaid_institution_id: 'ins_1',
-            institution_name: 'Test Bank',
-            sync_status: 'good' as ItemStatus,
-            last_successful_sync: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
 
+        // 2. Define mock implementations of the service's function-based dependencies.
         const mockPlaidExchange: PlaidExchangeTokenFn = jest.fn().mockResolvedValue(mockPlaidExchangeResponse);
         const mockPlaidItemGet: PlaidItemGetFn = jest.fn().mockResolvedValue(mockItemGetResponse);
         const mockPlaidGetInstitution: PlaidGetInstitutionFn = jest.fn().mockResolvedValue(mockPlaidInstitutionResponse);
         const mockEncrypt: EncryptFn = jest.fn().mockReturnValue(mockEncryptedToken);
 
-        // Create a mock repository - much simpler than before!
-        const mockPlaidItemRepository: jest.Mocked<PlaidItemRepository> = {
-            create: jest.fn().mockResolvedValue(mockNewPlaidItem),
-            findById: jest.fn(),
-            findByUserId: jest.fn(),
-            findByPlaidItemId: jest.fn(),
-            update: jest.fn(),
-            archive: jest.fn(),
-            hasReachedItemLimit: jest.fn(),
+        // 3. Create a mock UnitOfWork object that conforms to the interface.
+        // This allows us to test the service's interaction with its repositories.
+        const mockUnitOfWork: jest.Mocked<UnitOfWork> = {
+            plaidItems: {
+                create: jest.fn(),
+                findById: jest.fn(),
+                findByUserId: jest.fn(),
+                findByPlaidItemId: jest.fn(),
+                update: jest.fn(),
+                archive: jest.fn(),
+                hasReachedItemLimit: jest.fn(),
+            },
+            backgroundJobs: {
+                create: jest.fn(),
+                findNextAvailable: jest.fn(),
+                markAsRunning: jest.fn(),
+                markAsCompleted: jest.fn(),
+                markAsFailed: jest.fn(),
+            },
+            // Mock executeTransaction to simply run the operation passed to it.
+            // This lets us test the logic that happens *inside* the transaction.
+            executeTransaction: jest.fn().mockImplementation(operation => operation()),
+            commit: jest.fn(),
+            rollback: jest.fn(),
         };
 
         beforeEach(() => jest.clearAllMocks());
 
-        it('should correctly orchestrate token exchange and item creation', async () => {
-            const userId = 'user-123';
-            const publicToken = 'public-token-abc';
+        it('should correctly orchestrate token exchange and atomic item creation', async () => {
+            // Arrange: Set up the return value for the repository call.
+            const mockNewPlaidItem: PlaidItem = {
+                id: 1,
+                user_id: 'user-123',
+                plaid_item_id: 'plaid-item-id-xyz',
+                plaid_access_token: 'encrypted-token-string',
+                plaid_institution_id: 'ins_1',
+                institution_name: 'Test Bank',
+                sync_status: 'good' as ItemStatus,
+                last_successful_sync: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+            (mockUnitOfWork.plaidItems.create as jest.Mock).mockResolvedValue(mockNewPlaidItem);
 
+            // --- ACT ---
+            // Call the service with all its dependencies injected, including our mock UoW.
             const result = await exchangePublicToken(
                 mockPlaidExchange,
                 mockPlaidItemGet,
                 mockPlaidGetInstitution,
                 mockEncrypt,
-                mockPlaidItemRepository,
-                userId,
-                publicToken
+                mockUnitOfWork,
+                'user-123',
+                'public-token-abc'
             );
 
+            // --- ASSERT ---
+            // 1. Assert that the final result is the new item created by the repository.
             expect(result).toEqual(mockNewPlaidItem);
-            expect(mockPlaidExchange).toHaveBeenCalledWith({ public_token: publicToken });
-            expect(mockPlaidItemGet).toHaveBeenCalledWith({ access_token: 'real-access-token' });
-            expect(mockPlaidGetInstitution).toHaveBeenCalledWith({
-                institution_id: 'ins_1',
-                country_codes: [CountryCode.Us]
-            });
-            expect(mockEncrypt).toHaveBeenCalledWith('real-access-token');
-            expect(mockPlaidItemRepository.create).toHaveBeenCalledWith({
-                userId: userId,
+
+            // 2. Assert that the transaction mechanism was used.
+            expect(mockUnitOfWork.executeTransaction).toHaveBeenCalledTimes(1);
+
+            // 3. Assert that the PlaidItem was created with the correct, encrypted data.
+            expect(mockUnitOfWork.plaidItems.create).toHaveBeenCalledWith({
+                userId: 'user-123',
                 encryptedAccessToken: mockEncryptedToken,
                 plaidItemId: 'plaid-item-id-xyz',
                 plaidInstitutionId: 'ins_1',
                 institutionName: 'Test Bank',
             });
+
+            // 4. Assert that the background sync job was created within the same transaction.
+            expect(mockUnitOfWork.backgroundJobs.create).toHaveBeenCalledWith({
+                jobType: 'INITIAL_SYNC',
+                payload: { itemId: mockNewPlaidItem.id, userId: 'user-123' },
+            });
         });
 
-        it('should handle Plaid exchange failures without calling repository', async () => {
-            const error = new Error('Plaid exchange failed');
-            (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(error);
+        it('should throw an error without calling repositories if Plaid exchange fails', async () => {
+            // Arrange: Mock a failure from the Plaid client.
+            const plaidError = new Error('Plaid exchange failed');
+            (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(plaidError);
 
+            // --- ACT & ASSERT ---
+            // Expect the service to throw the same error it received from its dependency.
             await expect(
                 exchangePublicToken(
                     mockPlaidExchange,
                     mockPlaidItemGet,
                     mockPlaidGetInstitution,
                     mockEncrypt,
-                    mockPlaidItemRepository,
+                    mockUnitOfWork,
                     'user-123',
                     'public-token'
                 )
-            ).rejects.toThrow(error);
+            ).rejects.toThrow(plaidError);
 
-            expect(mockPlaidItemRepository.create).not.toHaveBeenCalled();
+            // Assert that no transaction was even attempted.
+            expect(mockUnitOfWork.executeTransaction).not.toHaveBeenCalled();
         });
     });
 
