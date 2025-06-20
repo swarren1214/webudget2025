@@ -8,18 +8,20 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy # Wait for the DB to be healthy
 
   migrate:
     build:
       context: ./server
     image: webudget-api # Use the same image as the api service
     depends_on:
-      - db # Ensure the database is ready before trying to run migrations
+      db:
+        condition: service_healthy # Wait for the DB to be healthy
     env_file:
       - .env
-    command: ["npm", "run", "migrate:up"]
-  
+    command: [ "npm", "run", "migrate:up" ]
+
   # --- PostgreSQL Database Service ---
   db:
     image: postgres:15-alpine
@@ -34,7 +36,17 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-  
+    # Add a healthcheck to ensure postgres is ready before other services connect
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # --- API Documentation Service ---
   docs:
     image: swaggerapi/swagger-ui:v5.17.14

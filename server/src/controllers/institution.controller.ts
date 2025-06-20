@@ -5,7 +5,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { DependencyContainer } from '../config/dependencies';
 import { getUserInstitutions, archiveInstitution, canLinkAnotherAccount } from '../services/plaid.service';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
-import { ItemStatus } from '../repositories/plaid.repository';
+import { ItemStatus } from '../repositories/interfaces/plaid-types';
 
 const container = DependencyContainer.getInstance();
 const plaidItemRepository = container.getPlaidItemRepository();
