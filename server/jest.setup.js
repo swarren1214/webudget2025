@@ -17,4 +17,4 @@ process.env.PLAID_ENV = 'sandbox';
 const user = process.env.POSTGRES_USER;
 const password = process.env.POSTGRES_PASSWORD;
 const dbName = process.env.POSTGRES_DB;
-process.env.DATABASE_URL = `postgresql://${user}:${password}@localhost:5432/${dbName}`;
+process.env.DATABASE_URL = `postgresql://${user}:${password}@db:5432/${dbName}`;

@@ -1,0 +1,17 @@
+# docker-compose.dev.yml
+services:
+  api:
+    build:
+      context: ./server
+      # Target the 'builder' stage, which has devDependencies installed
+      target: builder
+    command: npm run dev # Use the dev script with nodemon for hot-reloading
+    volumes:
+      # Mount the server source code directly into the container
+      - ./server:/usr/src/app
+      # Do not overwrite node_modules with a local empty folder
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+ 
