@@ -5,7 +5,7 @@ import { createLinkToken, exchangePublicToken } from '../services/plaid.service'
 import plaidClient from '../config/plaid';
 import { encrypt } from '../utils/crypto';
 import dbPool from '../config/database';
-import { PostgresTransactionManager } from '../repositories/postgres-transaction.manager';
+import { getRepositoryFactory } from '../repositories/repository.factory';
 import { UnauthorizedError, ValidationError } from '../utils/errors';
 import { AuthRequest } from '../middleware/auth.middleware';
 import {
@@ -40,8 +40,9 @@ const plaidInstitutionsGetById = async (request: InstitutionsGetByIdRequest): Pr
     return response.data;
 };
 
-// Create a single instance of the transaction manager
-const transactionManager = new PostgresTransactionManager(dbPool);
+// Get the repository factory and create repository instances
+const repositoryFactory = getRepositoryFactory(dbPool);
+const plaidItemRepository = repositoryFactory.getPlaidItemRepository();
 
 export const createLinkTokenHandler = async (
     req: AuthRequest,
@@ -56,7 +57,7 @@ export const createLinkTokenHandler = async (
 
         const tokenData = await createLinkToken(
             userId,
-            plaidLinkTokenCreate // Use wrapper function
+            plaidLinkTokenCreate
         );
 
         res.status(200).json(tokenData);
@@ -82,11 +83,11 @@ export const exchangePublicTokenHandler = async (
         }
 
         const newItem = await exchangePublicToken(
-            transactionManager,
-            plaidItemPublicTokenExchange, // Use wrapper function
-            plaidItemGet, // Use wrapper function
-            plaidInstitutionsGetById, // Use wrapper function
+            plaidItemPublicTokenExchange,
+            plaidItemGet,
+            plaidInstitutionsGetById,
             encrypt,
+            plaidItemRepository,
             userId,
             publicToken
         );

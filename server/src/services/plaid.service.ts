@@ -12,57 +12,14 @@ import {
     Products,
     CountryCode
 } from 'plaid';
-import { createPlaidItem, PlaidItem, PlaidItemToCreate } from '../repositories/plaid.repository';
+import { PlaidItemRepository } from '../repositories/interfaces/plaid-item.repository.interface';
+import { PlaidItem } from '../repositories/plaid.repository';
 import { ApiError } from '../utils/errors';
-import { TransactionManager } from '../repositories/transaction.manager';
 
-/**
- * This is the abstraction for the Plaid client's linkTokenCreate method.
- * It allows us to inject a mock for testing without depending on the real Plaid client.
- */
+// Keep the same type definitions for dependency injection
 export type PlaidLinkTokenCreateFn = (
     request: LinkTokenCreateRequest
 ) => Promise<LinkTokenCreateResponse>;
-
-/**
- * Creates a Plaid link token for a given user.
- *
- * @param userId - The unique identifier for the user.
- * @param plaidLinkTokenCreate - The dependency-injected function to call the Plaid API.
- * @returns An object containing the link_token and its expiration.
- */
-export const createLinkToken = async (
-    userId: string,
-    plaidLinkTokenCreate: PlaidLinkTokenCreateFn
-) => {
-    try {
-        const request: LinkTokenCreateRequest = {
-            user: {
-                client_user_id: userId,
-            },
-            client_name: 'WeBudget',
-            products: [Products.Transactions], // Use the enum
-            language: 'en',
-            country_codes: [CountryCode.Us], // Use the enum
-        };
-
-        const response = await plaidLinkTokenCreate(request);
-
-        return {
-            linkToken: response.link_token,
-            expiration: response.expiration,
-        };
-    } catch (error: unknown) { // Explicitly type as unknown
-        // Type guard for error handling
-        if (error && typeof error === 'object' && 'response' in error) {
-            const plaidError = error as any; // Type assertion for Plaid errors
-            if (plaidError.response?.data?.error_code === 'INVALID_CREDENTIALS') {
-                throw new ApiError('Invalid Plaid credentials', 500);
-            }
-        }
-        throw error;
-    }
-};
 
 export type PlaidExchangeTokenFn = (
     request: ItemPublicTokenExchangeRequest
@@ -78,25 +35,54 @@ export type PlaidItemGetFn = (
 
 export type EncryptFn = (text: string) => string;
 
+/**
+ * Creates a Plaid link token for a given user.
+ * This function has no infrastructure dependencies.
+ */
+export const createLinkToken = async (
+    userId: string,
+    plaidLinkTokenCreate: PlaidLinkTokenCreateFn
+) => {
+    try {
+        const request: LinkTokenCreateRequest = {
+            user: {
+                client_user_id: userId,
+            },
+            client_name: 'WeBudget',
+            products: [Products.Transactions],
+            language: 'en',
+            country_codes: [CountryCode.Us],
+        };
+
+        const response = await plaidLinkTokenCreate(request);
+
+        return {
+            linkToken: response.link_token,
+            expiration: response.expiration,
+        };
+    } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'response' in error) {
+            const plaidError = error as any;
+            if (plaidError.response?.data?.error_code === 'INVALID_CREDENTIALS') {
+                throw new ApiError('Invalid Plaid credentials', 500);
+            }
+        }
+        throw error;
+    }
+};
 
 /**
- * Exchanges a public token for an access token, encrypts it,
- * and creates a new Plaid item in the database.
- *
- * @param {PlaidExchangeTokenFn} plaidExchangeToken - Function to call Plaid's exchange token endpoint.
- * @param {PlaidGetInstitutionFn} plaidGetInstitution - Function to call Plaid's get institution endpoint.
- * @param {EncryptFn} encrypt - Function to encrypt the access token.
- * @param {CreatePlaidItemFn} createPlaidItemInDb - The repository function to save the item.
- * @param {string} userId - The ID of the authenticated user.
- * @param {string} publicToken - The public token from the Plaid Link client.
- * @returns {Promise<PlaidItem>} The newly created Plaid item.
+ * Exchanges a public token for an access token and creates a new Plaid item.
+ * 
+ * Notice: No more Pool, no more connection management!
+ * The service only knows about the repository interface.
  */
 export const exchangePublicToken = async (
-    transactionManager: TransactionManager,  // Changed from Pool
     plaidExchangeToken: PlaidExchangeTokenFn,
     plaidItemGet: PlaidItemGetFn,
     plaidGetInstitution: PlaidGetInstitutionFn,
     encrypt: EncryptFn,
+    plaidItemRepository: PlaidItemRepository,  // Interface, not implementation!
     userId: string,
     publicToken: string,
 ): Promise<PlaidItem> => {
@@ -123,23 +109,57 @@ export const exchangePublicToken = async (
     // 4. Encrypt the access token before storing it
     const encryptedAccessToken = encrypt(accessToken);
 
-    // 5. Prepare the data for the repository
-    const itemToCreate: PlaidItemToCreate = {
+    // 5. Use the repository to create the item
+    // The service doesn't know or care about transactions or connections!
+    return plaidItemRepository.create({
         userId,
         encryptedAccessToken,
         plaidItemId: itemId,
         plaidInstitutionId: institutionId,
         institutionName,
-    };
-
-    // 6. Use transaction manager to handle the database operation
-    return transactionManager.executeInTransaction(async (client) => {
-        // Create the Plaid item
-        const newItem = await createPlaidItem(client, itemToCreate);
-
-        // Future: Queue the background job
-        // await createBackgroundJob(client, 'INITIAL_SYNC', { item_id: newItem.id });
-
-        return newItem;
     });
-}
+};
+
+/**
+ * Checks if a user can link another bank account
+ */
+export const canLinkAnotherAccount = async (
+    userId: string,
+    plaidItemRepository: PlaidItemRepository,
+    maxAccounts: number = 10
+): Promise<boolean> => {
+    const hasReachedLimit = await plaidItemRepository.hasReachedItemLimit(userId, maxAccounts);
+    return !hasReachedLimit;
+};
+
+/**
+ * Gets all linked institutions for a user
+ */
+export const getUserInstitutions = async (
+    userId: string,
+    plaidItemRepository: PlaidItemRepository
+): Promise<PlaidItem[]> => {
+    return plaidItemRepository.findByUserId(userId);
+};
+
+/**
+ * Archives a linked institution
+ */
+export const archiveInstitution = async (
+    userId: string,
+    institutionId: number,
+    plaidItemRepository: PlaidItemRepository
+): Promise<void> => {
+    // First verify the institution belongs to the user
+    const institution = await plaidItemRepository.findById(institutionId);
+
+    if (!institution) {
+        throw new ApiError('Institution not found', 404);
+    }
+
+    if (institution.user_id !== userId) {
+        throw new ApiError('You do not have permission to archive this institution', 403);
+    }
+
+    await plaidItemRepository.archive(institutionId);
+};
