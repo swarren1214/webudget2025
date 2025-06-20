@@ -1,6 +1,6 @@
 // server/src/repositories/interfaces/plaid-item.repository.interface.ts
 
-import { PlaidItem, ItemStatus } from '../plaid.repository';
+import { PlaidItem, ItemStatus } from '../interfaces';
 
 /**
  * Represents the data needed to create a new Plaid item

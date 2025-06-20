@@ -13,9 +13,8 @@ import {
     CountryCode
 } from 'plaid';
 import { UnitOfWork } from '../repositories/interfaces/unit-of-work.interface';
-import { PlaidItem } from '../repositories/plaid.repository';
 import { ApiError } from '../utils/errors';
-import { PlaidItemRepository } from '../repositories/interfaces';
+import { PlaidItem, PlaidItemRepository } from '../repositories/interfaces';
 
 // Keep the same type definitions for dependency injection
 export type PlaidLinkTokenCreateFn = (

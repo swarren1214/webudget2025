@@ -12,10 +12,8 @@ import {
     canLinkAnotherAccount,
     archiveInstitution
 } from './plaid.service';
-import { PlaidItemRepository } from '../repositories/interfaces/plaid-item.repository.interface';
-import { PlaidItem, ItemStatus } from '../repositories/plaid.repository';
+import { PlaidItemRepository, UnitOfWork, PlaidItem, ItemStatus } from '../repositories/interfaces';
 import { ApiError } from '../utils/errors';
-import { UnitOfWork } from '../repositories/interfaces/unit-of-work.interface';
 
 describe('Plaid Service', () => {
     // Mock dependencies
@@ -45,7 +43,6 @@ describe('Plaid Service', () => {
                 linkToken: mockPlaidSuccessResponse.link_token,
                 expiration: mockPlaidSuccessResponse.expiration,
             });
-
             expect(mockPlaidClientSuccess).toHaveBeenCalledTimes(1);
             expect(mockPlaidClientSuccess).toHaveBeenCalledWith({
                 user: { client_user_id: userId },

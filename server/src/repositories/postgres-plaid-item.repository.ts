@@ -1,12 +1,11 @@
 // server/src/repositories/postgres-plaid-item.repository.ts
 
-import { PoolClient } from 'pg';
 import {
     PlaidItemRepository,
     CreatePlaidItemData,
     UpdatePlaidItemData
 } from './interfaces/plaid-item.repository.interface';
-import { PlaidItem } from './plaid.repository';
+import { PlaidItem } from './interfaces';
 import { TransactionManager } from './transaction.manager';
 import logger from '../logger';
 
