@@ -8,9 +8,9 @@ import { AuthRequest } from '../middleware/auth.middleware';
 
 // Get dependencies from the container
 const container = DependencyContainer.getInstance();
-const plaidItemRepository = container.getPlaidItemRepository();
 const plaidWrappers = container.getPlaidClientWrappers();
 const { encrypt } = container.getCryptoUtils();
+const unitOfWork = container.createUnitOfWork();
 
 export const createLinkTokenHandler = async (
     req: AuthRequest,
@@ -55,7 +55,7 @@ export const exchangePublicTokenHandler = async (
             plaidWrappers.itemGet,
             plaidWrappers.institutionsGetById,
             encrypt,
-            plaidItemRepository,
+            unitOfWork,
             userId,
             publicToken
         );
