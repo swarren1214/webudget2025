@@ -12,9 +12,10 @@ import {
     Products,
     CountryCode
 } from 'plaid';
-import { PlaidItemRepository } from '../repositories/interfaces/plaid-item.repository.interface';
+import { UnitOfWork } from '../repositories/interfaces/unit-of-work.interface';
 import { PlaidItem } from '../repositories/plaid.repository';
 import { ApiError } from '../utils/errors';
+import { PlaidItemRepository } from '../repositories/interfaces';
 
 // Keep the same type definitions for dependency injection
 export type PlaidLinkTokenCreateFn = (
@@ -53,7 +54,6 @@ export const createLinkToken = async (
             language: 'en',
             country_codes: [CountryCode.Us],
         };
-
         const response = await plaidLinkTokenCreate(request);
 
         return {
@@ -73,18 +73,18 @@ export const createLinkToken = async (
 
 /**
  * Exchanges a public token for an access token and creates a new Plaid item.
- * 
- * Notice: No more Pool, no more connection management!
- * The service only knows about the repository interface.
+ *
+ * Notice: This service now only knows about the repository interface.
+ * It is decoupled from the database driver.
  */
 export const exchangePublicToken = async (
     plaidExchangeToken: PlaidExchangeTokenFn,
     plaidItemGet: PlaidItemGetFn,
     plaidGetInstitution: PlaidGetInstitutionFn,
     encrypt: EncryptFn,
-    plaidItemRepository: PlaidItemRepository,  // Interface, not implementation!
+    unitOfWork: UnitOfWork, // The new dependency, an abstraction.
     userId: string,
-    publicToken: string,
+    publicToken: string
 ): Promise<PlaidItem> => {
     // 1. Exchange the public token for an access token from Plaid
     const exchangeResponse = await plaidExchangeToken({ public_token: publicToken });
@@ -109,14 +109,25 @@ export const exchangePublicToken = async (
     // 4. Encrypt the access token before storing it
     const encryptedAccessToken = encrypt(accessToken);
 
-    // 5. Use the repository to create the item
-    // The service doesn't know or care about transactions or connections!
-    return plaidItemRepository.create({
-        userId,
-        encryptedAccessToken,
-        plaidItemId: itemId,
-        plaidInstitutionId: institutionId,
-        institutionName,
+    // 5. Use the Unit of Work to perform the database operations atomically.
+    // This ensures that creating the item and queueing the sync job either
+    // both succeed or both fail, preventing data inconsistencies.
+    return unitOfWork.executeTransaction(async () => {
+        const newItem = await unitOfWork.plaidItems.create({
+            userId,
+            encryptedAccessToken,
+            plaidItemId: itemId,
+            plaidInstitutionId: institutionId,
+            institutionName,
+        });
+
+        // 6. Queue a background job for the initial transaction sync.
+        await unitOfWork.backgroundJobs.create({
+            jobType: 'INITIAL_SYNC',
+            payload: { itemId: newItem.id, userId: userId },
+        });
+
+        return newItem;
     });
 };
 
@@ -152,7 +163,6 @@ export const archiveInstitution = async (
 ): Promise<void> => {
     // First verify the institution belongs to the user
     const institution = await plaidItemRepository.findById(institutionId);
-
     if (!institution) {
         throw new ApiError('Institution not found', 404);
     }
