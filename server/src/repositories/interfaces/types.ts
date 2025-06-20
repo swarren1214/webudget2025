@@ -1,5 +1,13 @@
 // server/src/repositories/interfaces/types.ts
 
+import { Pool, PoolClient } from 'pg';
+
+/**
+* Represents a queryable connection to the database, which can be either
+* the entire connection pool or a single client checked out for a transaction.
+*/
+export type DbConnection = Pool | PoolClient;
+
 /**
  * Common query options for repository methods
  */
