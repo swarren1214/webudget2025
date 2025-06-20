@@ -11,5 +11,9 @@
   },
   "include": [
     "src/**/*"
-  ] /* Include all files in the src directory for compilation */
+  ], /* Include all files in the src directory for compilation */
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts"
+  ]
 }

@@ -1,14 +1,16 @@
-// src/api/routes/index.ts
-import { Router, Request, Response } from 'express';
+// server/src/api/routes/index.ts
+import { Router } from 'express';
+import healthRouter from './health.routes';
+import metricsRouter from './metrics.routes';
+import v1Router from './v1.routes';
 
-const router = Router();
+const mainRouter = Router();
 
-// Test route for the V1 API
-router.get('/', (req: Request, res: Response) => {
-    res.status(200).json({ message: 'Welcome to the WeBudget API v1' });
-});
+// Mount operational routes at the root level
+mainRouter.use(healthRouter);
+mainRouter.use(metricsRouter);
 
-// We will import other route files here later
-// e.g., router.use('/plaid', plaidRoutes);
+// Mount the versioned API routes under the /api/v1 prefix
+mainRouter.use('/api/v1', v1Router);
 
-export default router;
+export default mainRouter;

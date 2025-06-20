@@ -2,7 +2,12 @@
 import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import apiV1Router from './api/routes';
+import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics';
+import logger from './logger';
+import pinoHttp from 'pino-http';
+import { randomUUID } from 'crypto';
+import mainRouter from './api/routes';
+import { errorHandler } from './middleware/error.middleware';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -11,21 +16,50 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 3000;
 
+app.use(pinoHttp({
+  logger,
+  // Define a custom request ID header
+  genReqId: function (req, res) {
+    const existingId = req.id ?? req.headers["x-request-id"];
+    if (existingId) return existingId;
+    const id = randomUUID();
+    res.setHeader('X-Request-Id', id);
+    return id;
+  },
+}));
+
 // --- Global Middleware ---
 // Enable Cross-Origin Resource Sharing
 app.use(cors());
 // Enable JSON body parsing
 app.use(express.json());
 
-// --- Health Check Endpoint ---
-// A simple endpoint to confirm the server is running
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+app.use((req, res, next) => {
+  const end = httpRequestDurationSeconds.startTimer();
+
+  res.on('finish', () => {
+    const route = req.route ? req.route.path : req.originalUrl.split('?')[0];
+
+    const labels = {
+      method: req.method,
+      route: route,
+      code: res.statusCode.toString()
+    };
+
+    end(labels); // Record the duration
+    httpRequestsTotal.inc(labels); // Increment the counter
+  });
+
+  next();
 });
 
-app.use('/api/v1', apiV1Router);
+// --- API Routes ---
+app.use('/', mainRouter);
+
+// IMPORTANT: Error handler must be the LAST middleware
+app.use(errorHandler);
 
 // --- Start the Server ---
 app.listen(port, () => {
-  console.log(`[server]: Server is running at http://localhost:${port}`);
+  logger.info(`[server]: Server is running at http://localhost:${port}`);
 });

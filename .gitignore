@@ -4,3 +4,4 @@ dist
 vite.config.ts.*
 *.tar.gz.env
 .env
+combined_repo.txt

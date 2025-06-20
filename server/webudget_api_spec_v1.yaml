@@ -1,4 +1,4 @@
-# WeBudget API Specification v1.0.0
+# WeBudget API Specification v1.1.0
 # This document defines the RESTful API for the WeBudget MVP.
 # It follows the OpenAPI 3.0 standard.
 
@@ -16,30 +16,25 @@ info:
     - **Dates:** ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)
     - **Error Handling:** Standardized JSON error body
     - **Pagination:** Offset/Limit strategy
-  version: "1.0.0"
+  version: "1.1.0"
   contact:
     name: "Backend Team"
     email: "etiennebeaulac@gmail.com"
 
-# Defines the server environments for the API.
 servers:
   - url: http://localhost:3000/api/v1
     description: Local development server
   - url: https://api.webudget.app/api/v1
     description: Production server (Future)
 
-# Defines the security scheme for the API. We use JWTs.
 security:
   - bearerAuth: []
 
-# Organizes endpoints into logical groups.
 tags:
   - name: Plaid
     description: Endpoints for integrating with the Plaid API.
   - name: Institutions
-    description: Endpoints for managing linked financial institutions (Plaid Items).
-  - name: Accounts
-    description: Endpoints for retrieving financial accounts.
+    description: Endpoints for managing and retrieving linked financial institutions.
   - name: Transactions
     description: Endpoints for retrieving transactions.
   - name: Health
@@ -57,7 +52,6 @@ paths:
       summary: Create Plaid Link Token
       description: |-
         Generates a short-lived `link_token` required to initialize the Plaid Link frontend component.
-        This token authorizes the app to connect to a user's financial institution.
       operationId: createLinkToken
       responses:
         "200":
@@ -73,9 +67,11 @@ paths:
                   expiration:
                     type: string
                     format: date-time
-                    example: "2025-06-17T20:53:00.123Z"
+                    example: "2025-06-17T20:34:25.000Z"
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/TooManyRequests'
         "500":
           $ref: '#/components/responses/InternalServerError'
 
@@ -85,9 +81,8 @@ paths:
         - Plaid
       summary: Exchange Public Token
       description: |-
-        Exchanges a `public_token` (obtained from a successful Plaid Link flow) for a permanent `access_token`.
-        This endpoint securely stores the `access_token` and queues a background job to perform the initial data sync for accounts and transactions.
-        It immediately returns a `202 Accepted` to the client.
+        Exchanges a `public_token` for a permanent `access_token` and creates a new Institution resource.
+        This endpoint queues a background job for the initial data sync and immediately returns a `202 Accepted`.
       operationId: exchangePublicToken
       requestBody:
         required: true
@@ -97,29 +92,19 @@ paths:
               type: object
               required:
                 - publicToken
-                - institution
               properties:
                 publicToken:
                   type: string
                   description: The public token from the Plaid Link success callback.
-                institution:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                      description: The institution's stable identifier from Plaid.
-                    name:
-                      type: string
-                      description: The institution's name from Plaid.
       responses:
         "202":
           description: |-
             Accepted. The token exchange was successful and the initial data sync has been queued.
-            The client receives the newly created Plaid Item resource with a `syncStatus` of `syncing`.
+            The response body contains the newly created Institution resource with a `syncStatus` of `syncing`.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlaidItem'
+                $ref: '#/components/schemas/Institution'
         "400":
           $ref: '#/components/responses/BadRequest'
         "401":
@@ -127,21 +112,66 @@ paths:
         "500":
           $ref: '#/components/responses/InternalServerError'
 
-  # --- Institutions (Plaid Items) ---
-  /items/{itemId}:
+  # --- Institutions ---
+  /institutions:
+    get:
+      tags:
+        - Institutions
+      summary: Get All Institutions and their Accounts
+      description: |-
+        Returns a paginated list of all financial institutions for the authenticated user, with their nested accounts.
+      operationId: getInstitutions
+      parameters:
+        - name: limit
+          in: query
+          description: The number of institutions to return.
+          schema:
+            type: integer
+            default: 25
+            maximum: 100
+        - name: offset
+          in: query
+          description: The number of institutions to skip for pagination.
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: A paginated list of the user's institutions, each containing their accounts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InstitutionWithAccounts'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  /institutions/{institutionId}:
     delete:
       tags:
         - Institutions
-      summary: Remove Linked Institution
+      summary: Archive Linked Institution
       description: |-
-        Removes a connection to a financial institution (a Plaid Item) and all of its associated accounts and transactions.
-        This action is irreversible as per the selected deletion policy (hard delete for MVP).
-      operationId: deleteItem
+        Archives a connection to a financial institution. This performs a soft delete.
+        All associated accounts and transactions will be hidden from the user but preserved in the system.
+      operationId: deleteInstitution
       parameters:
-        - $ref: '#/components/parameters/ItemId'
+        - $ref: '#/components/parameters/InstitutionId'
       responses:
-        "204":
-          description: The institution and all related data were successfully deleted.
+        "200":
+          description: The institution was successfully archived. The response body contains the updated resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Institution'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -151,7 +181,7 @@ paths:
         "500":
           $ref: '#/components/responses/InternalServerError'
 
-  /items/{itemId}/refresh:
+  /institutions/{institutionId}/refresh:
     post:
       tags:
         - Institutions
@@ -159,13 +189,18 @@ paths:
       description: |-
         Triggers an immediate, asynchronous data refresh for a specific institution.
         The API will respond with `202 Accepted` and queue a background job to sync transactions.
-        The client should monitor the `syncStatus` on the Plaid Item to see the result.
-      operationId: refreshItem
+      operationId: refreshInstitution
       parameters:
-        - $ref: '#/components/parameters/ItemId'
+        - $ref: '#/components/parameters/InstitutionId'
       responses:
         "202":
-          description: Accepted. The data refresh has been successfully queued.
+          description: |-
+            Accepted. The data refresh has been successfully queued.
+            The response body contains the institution resource with its `syncStatus` updated to `syncing`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Institution'
         "401":
           $ref: '#/components/responses/Unauthorized'
         "403":
@@ -177,30 +212,45 @@ paths:
         "500":
           $ref: '#/components/responses/InternalServerError'
 
-  # --- Accounts ---
-  /accounts:
-    get:
+  /institutions/{institutionId}/relink-token:
+    post:
       tags:
-        - Accounts
-      summary: Get All Accounts
+        - Institutions
+      summary: Create Relink Token
       description: |-
-        Returns a list of all financial accounts for the authenticated user, grouped by institution.
-        This is the primary endpoint for the "Accounts" page in the UI.
-      operationId: getAccounts
+        Creates a new `link_token` for an existing Institution that is in an error state (e.g., `relink_required`).
+        This token is used to initialize Plaid Link in "update mode," allowing the user to re-authenticate their credentials
+        and fix the connection.
+      operationId: createRelinkToken
+      parameters:
+        - $ref: '#/components/parameters/InstitutionId'
       responses:
         "200":
-          description: A list of the user's accounts, grouped by institution.
+          description: Successfully created the link token for update mode.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/PlaidItemWithAccounts'
+                  linkToken:
+                    type: string
+                    example: "link-sandbox-c8b1b0a7-a37e-405a-8b89-9b993302758f"
+                  expiration:
+                    type: string
+                    format: date-time
+                    example: "2025-06-18T14:05:00.000Z"
         "401":
           $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409": 
+          description: The institution is not in a state that requires relinking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         "500":
           $ref: '#/components/responses/InternalServerError'
 
@@ -212,42 +262,50 @@ paths:
       summary: List All Transactions
       description: |-
         Returns a paginated list of all transactions for the authenticated user from all linked accounts.
-        Supports filtering by date range, account, and search query.
+        Supports filtering by date range, account(s), category, and search query.
       operationId: getTransactions
       parameters:
         - name: limit
           in: query
-          description: The maximum number of transactions to return.
           schema:
             type: integer
             default: 25
             maximum: 100
         - name: offset
           in: query
-          description: The number of transactions to skip for pagination.
           schema:
             type: integer
             default: 0
-        - name: accountId
+        - name: accountIds
           in: query
-          description: Filter transactions by a specific account ID.
+          description: "A comma-separated list of account IDs to filter transactions by."
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+          example: "acct_55pp66oo77ii88uu99,acct_abc123def456"
         - name: startDate
           in: query
-          description: The start date for the filter (ISO 8601 format).
           schema:
             type: string
             format: date
         - name: endDate
           in: query
-          description: The end date for the filter (ISO 8601 format).
           schema:
             type: string
             format: date
         - name: category
           in: query
-          description: Filter by Plaid's primary category (e.g., 'Transfer').
+          description: |-
+            A string to filter transactions by category. This performs a case-insensitive search on Plaid's `detailedCategory`. To retrieve only internal transfers, use Plaid's official 'Transfer' category name.
+          schema:
+            type: string
+            example: "Restaurants"
+        - name: searchText
+          in: query
+          description: "A text string to perform a case-insensitive search across the transaction's **merchant name** and **detailed category** fields."
           schema:
             type: string
       responses:
@@ -271,17 +329,69 @@ paths:
         "500":
           $ref: '#/components/responses/InternalServerError'
 
+  /transactions/{transactionId}:
+    patch:
+      tags:
+        - Transactions
+      summary: Update a Transaction
+      description: |-
+        Updates one or more properties of a specific transaction.
+        This is used to add user-defined notes or to re-categorize a transaction.
+        The user must be the owner of the account to which the transaction belongs.
+      operationId: updateTransaction
+      parameters:
+        - $ref: '#/components/parameters/TransactionId'
+      requestBody:
+        description: A JSON object containing only the fields to be updated.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  nullable: true
+                  description: "User-defined notes for the transaction. A null value will clear any existing notes."
+                  maxLength: 500
+                  example: "Split with Jane for dinner."
+                userCategoryId:
+                  type: string
+                  nullable: true
+                  description: "The ID of a user-defined category to override the one from Plaid. A null value will revert to Plaid's default category."
+                  pattern: "^cat_usr_[a-zA-Z0-9]+$"
+                  example: "cat_usr_9f8e7d6c5b4a"
+              additionalProperties: false
+              minProperties: 1
+      responses:
+        "200":
+          description: The transaction was updated successfully. The full, updated transaction is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
   # --- Health Check ---
   /health:
     get:
       tags:
         - Health
       summary: System Health Check
-      description: |-
-        A public, unauthenticated endpoint to verify that the API service is running.
-        Can be used by monitoring services.
       operationId: getHealth
-      security: [] # No authentication required for this endpoint
+      description: |-
+        A public, unauthenticated endpoint to verify that the API service is running and can connect to its dependencies.
+        Returns the operational status of the service.
+      security: []
       responses:
         "200":
           description: The service is healthy.
@@ -303,47 +413,50 @@ paths:
 components:
   # --- Schemas (Data Models) ---
   schemas:
-    User:
+    Institution:
       type: object
       properties:
         id:
           type: string
-          description: Unique User ID from Auth0 (sub claim).
-        email:
-          type: string
-          format: email
-        fullName:
-          type: string
-        profileImageUrl:
-          type: string
-          format: uri
-          nullable: true
-
-    PlaidItem:
-      type: object
-      properties:
-        id:
-          type: string
-          description: The unique ID for the Plaid Item in our database.
+          description: The unique ID for the Institution in our database.
+          example: "inst_11xxyy22zz33aabb44"
         plaidInstitutionId:
           type: string
           description: The stable institution ID from Plaid.
+          example: "ins_3"
         institutionName:
           type: string
           example: "Chase Bank"
+        institutionLogo:
+          type: string
+          format: uri
+          nullable: true
+          description: A base64-encoded logo for the institution.
+          example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
         syncStatus:
           type: string
           enum: [good, syncing, relink_required, error]
-          description: The current data synchronization status of the item.
+          example: "good"
         lastSuccessfulSync:
           type: string
           format: date-time
           nullable: true
-          description: Timestamp of the last successful data fetch.
+          example: "2025-06-17T20:30:00.000Z"
+        lastSyncErrorMessage:
+          type: string
+          nullable: true
+          description: The error message from the last failed sync attempt.
+          example: "ITEM_LOGIN_REQUIRED"
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when the institution was soft-deleted.
+          example: "2025-06-18T10:00:00.000Z"
 
-    PlaidItemWithAccounts:
+    InstitutionWithAccounts:
       allOf:
-        - $ref: '#/components/schemas/PlaidItem'
+        - $ref: '#/components/schemas/Institution'
         - type: object
           properties:
             accounts:
@@ -357,9 +470,11 @@ components:
         id:
           type: string
           description: The unique ID for the Account in our database.
+          example: "acct_55pp66oo77ii88uu99"
         plaidAccountId:
           type: string
           description: The unique account ID from Plaid.
+          example: "Bxp9pG1mpEtMmKqjK1EGFaVjv4qg74w7eB6lL"
         name:
           type: string
           example: "Primary Checking"
@@ -385,6 +500,12 @@ components:
         currencyCode:
           type: string
           example: "USD"
+        creditLimit:
+          type: number
+          format: double
+          nullable: true
+          description: The credit limit for credit card accounts.
+          example: 10000.00
 
     Transaction:
       type: object
@@ -392,16 +513,18 @@ components:
         id:
           type: string
           description: The unique ID for the transaction in our database.
+          example: "txn_ff66aa77bb88cc99dd"
         plaidTransactionId:
           type: string
           description: The unique transaction ID from Plaid.
+          example: "j1KnPo9a3pCpm4k3kG3KcoE5d7R6p7l5dEAZa"
         accountId:
           type: string
           description: The ID of the account this transaction belongs to.
+          example: "acct_55pp66oo77ii88uu99"
         amount:
           type: number
           format: double
-          description: Transaction amount. Negative for debits, positive for credits.
           example: -12.50
         currencyCode:
           type: string
@@ -409,18 +532,42 @@ components:
         date:
           type: string
           format: date
-          description: The date the transaction was posted.
+          example: "2025-06-15"
         merchantName:
           type: string
           nullable: true
           example: "Starbucks"
+        merchantLogo:
+          type: string
+          format: uri
+          nullable: true
+          description: The logo of the merchant, if available.
+          example: "https://plaid-merchant-logos.plaid.com/starbucks_1060.png"
         primaryCategory:
           type: string
           nullable: true
           example: "Food and Drink"
+        detailedCategory:
+          type: string
+          nullable: true
+          example: "Restaurants"
         isPending:
           type: boolean
-          description: True if the transaction is still pending.
+          example: false
+        transactionType:
+          type: string
+          nullable: true
+          description: "Transaction type from Plaid, e.g., 'special', 'place', 'digital'."
+        paymentChannel:
+          type: string
+          nullable: true
+          description: "The channel of the transaction, e.g., 'online', 'in store', 'other'."
+        notes:
+          type: string
+          nullable: true
+        userCategoryId:
+          type: string
+          nullable: true
 
     Pagination:
       type: object
@@ -446,52 +593,66 @@ components:
               example: "RESOURCE_NOT_FOUND"
             message:
               type: string
-              example: "The requested item with ID '123' was not found."
+              example: "The requested institution with ID 'inst_123' was not found."
+            requestId:
+              type: string
+              description: A unique identifier for the request, useful for debugging and support.
+              example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
 
   # --- Reusable Parameters ---
   parameters:
-    ItemId:
-      name: itemId
+    InstitutionId:
+      name: institutionId
       in: path
       required: true
-      description: The unique identifier of the Plaid Item (linked institution).
+      description: The unique identifier of the linked institution.
       schema:
         type: string
+        example: "inst_11xxyy22zz33aabb44"
+
+    TransactionId:
+      name: transactionId
+      in: path
+      required: true
+      description: The unique identifier of the transaction.
+      schema:
+        type: string
+        example: "txn_ff66aa77bb88cc99dd"
 
   # --- Reusable Responses ---
   responses:
     BadRequest:
-      description: Bad Request. The request was malformed or contained invalid parameters.
+      description: Bad Request. The server could not process the request due to a client error (e.g., malformed syntax, invalid parameters).
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
     Unauthorized:
-      description: Unauthorized. The request requires authentication, but the token was missing or invalid.
+      description: Unauthorized. The request requires authentication, but the provided token was missing or invalid.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
     Forbidden:
-      description: Forbidden. The authenticated user does not have permission to perform this action.
+      description: Forbidden. The authenticated user does not have permission to perform this action on the requested resource.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
     NotFound:
-      description: Not Found. The requested resource could not be found.
+      description: Not Found. The requested resource could not be found on the server.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
     TooManyRequests:
-      description: Rate limit exceeded.
+      description: Rate limit exceeded. The client has sent too many requests in a given amount of time.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
     InternalServerError:
-      description: Internal Server Error. An unexpected error occurred on the server.
+      description: Internal Server Error. An unexpected error occurred on the server that prevented it from fulfilling the request.
       content:
         application/json:
           schema:
@@ -503,6 +664,3 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: |-
-        JWT-based authentication. For web clients, the token is managed automatically via a secure, HttpOnly cookie.
-        For non-web clients, provide the token in the `Authorization` header: `Authorization: Bearer <JWT>`.
