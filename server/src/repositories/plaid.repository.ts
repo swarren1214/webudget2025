@@ -1,7 +1,8 @@
 // server/src/repositories/plaid.repository.ts
 
 import { PoolClient } from 'pg';
-import { ItemStatus } from 'plaid';
+
+export type ItemStatus = 'good' | 'syncing' | 'relink_required' | 'error';
 
 export interface PlaidItemToCreate {
     userId: string;

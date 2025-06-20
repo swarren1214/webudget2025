@@ -1,6 +1,6 @@
 // server/src/services/plaid.service.test.ts
 
-import { CountryCode, Products, ItemStatus } from 'plaid';
+import { CountryCode, Products } from 'plaid';
 import {
     createLinkToken,
     PlaidLinkTokenCreateFn,
@@ -13,7 +13,7 @@ import {
     archiveInstitution
 } from './plaid.service';
 import { PlaidItemRepository } from '../repositories/interfaces/plaid-item.repository.interface';
-import { PlaidItem } from '../repositories/plaid.repository';
+import { PlaidItem, ItemStatus } from '../repositories/plaid.repository';
 import { ApiError } from '../utils/errors';
 
 describe('Plaid Service', () => {

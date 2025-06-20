@@ -2,18 +2,24 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { checkHealth } from '../services/health.service';
-import { checkConnection } from '../config/database';
+import { DependencyContainer } from '../config/dependencies';
 
-/**
- * Handles the HTTP request for the health check endpoint.
- */
+const container = DependencyContainer.getInstance();
+
 export const getHealthStatus = async (
     req: Request,
     res: Response,
     next: NextFunction
 ): Promise<void> => {
     try {
-        const healthStatus = await checkHealth(checkConnection);
+        // Create a check function that uses our repositories
+        const checkDbConnection = async () => {
+            const repository = container.getPlaidItemRepository();
+            // Simple query to verify connection
+            await repository.findById(-1); // Won't find anything, but tests connection
+        };
+
+        const healthStatus = await checkHealth(checkDbConnection);
 
         if (healthStatus.status === 'OK') {
             res.status(200).json(healthStatus);

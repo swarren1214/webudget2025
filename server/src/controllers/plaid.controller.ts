@@ -1,48 +1,16 @@
 // server/src/controllers/plaid.controller.ts
 
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { createLinkToken, exchangePublicToken } from '../services/plaid.service';
-import plaidClient from '../config/plaid';
-import { encrypt } from '../utils/crypto';
-import dbPool from '../config/database';
-import { getRepositoryFactory } from '../repositories/repository.factory';
+import { DependencyContainer } from '../config/dependencies';
 import { UnauthorizedError, ValidationError } from '../utils/errors';
 import { AuthRequest } from '../middleware/auth.middleware';
-import {
-    LinkTokenCreateRequest,
-    LinkTokenCreateResponse,
-    ItemPublicTokenExchangeRequest,
-    ItemPublicTokenExchangeResponse,
-    ItemGetRequest,
-    ItemGetResponse,
-    InstitutionsGetByIdRequest,
-    InstitutionsGetByIdResponse
-} from 'plaid';
 
-// Create wrapper functions that extract the data from Axios responses
-const plaidLinkTokenCreate = async (request: LinkTokenCreateRequest): Promise<LinkTokenCreateResponse> => {
-    const response = await plaidClient.linkTokenCreate(request);
-    return response.data;
-};
-
-const plaidItemPublicTokenExchange = async (request: ItemPublicTokenExchangeRequest): Promise<ItemPublicTokenExchangeResponse> => {
-    const response = await plaidClient.itemPublicTokenExchange(request);
-    return response.data;
-};
-
-const plaidItemGet = async (request: ItemGetRequest): Promise<ItemGetResponse> => {
-    const response = await plaidClient.itemGet(request);
-    return response.data;
-};
-
-const plaidInstitutionsGetById = async (request: InstitutionsGetByIdRequest): Promise<InstitutionsGetByIdResponse> => {
-    const response = await plaidClient.institutionsGetById(request);
-    return response.data;
-};
-
-// Get the repository factory and create repository instances
-const repositoryFactory = getRepositoryFactory(dbPool);
-const plaidItemRepository = repositoryFactory.getPlaidItemRepository();
+// Get dependencies from the container
+const container = DependencyContainer.getInstance();
+const plaidItemRepository = container.getPlaidItemRepository();
+const plaidWrappers = container.getPlaidClientWrappers();
+const { encrypt } = container.getCryptoUtils();
 
 export const createLinkTokenHandler = async (
     req: AuthRequest,
@@ -57,7 +25,7 @@ export const createLinkTokenHandler = async (
 
         const tokenData = await createLinkToken(
             userId,
-            plaidLinkTokenCreate
+            plaidWrappers.linkTokenCreate
         );
 
         res.status(200).json(tokenData);
@@ -83,9 +51,9 @@ export const exchangePublicTokenHandler = async (
         }
 
         const newItem = await exchangePublicToken(
-            plaidItemPublicTokenExchange,
-            plaidItemGet,
-            plaidInstitutionsGetById,
+            plaidWrappers.itemPublicTokenExchange,
+            plaidWrappers.itemGet,
+            plaidWrappers.institutionsGetById,
             encrypt,
             plaidItemRepository,
             userId,

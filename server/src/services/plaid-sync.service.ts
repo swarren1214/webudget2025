@@ -1,6 +1,7 @@
 // server/src/services/plaid-sync.service.ts
 
 import { UnitOfWork } from '../repositories/interfaces/unit-of-work.interface';
+import { ItemStatus } from '../repositories/plaid.repository';
 import logger from '../logger';
 
 export interface SyncResult {
@@ -24,8 +25,9 @@ export class PlaidSyncService {
     ): Promise<void> {
         await unitOfWork.executeTransaction(async () => {
             // Update item status to syncing
+            const syncingStatus: ItemStatus = 'syncing';
             await unitOfWork.plaidItems.update(itemId, {
-                syncStatus: 'syncing' as any
+                syncStatus: syncingStatus
             });
 
             // Create background job
@@ -49,8 +51,9 @@ export class PlaidSyncService {
     ): Promise<void> {
         await unitOfWork.executeTransaction(async () => {
             // Update item with successful sync
+            const goodStatus: ItemStatus = 'good';
             await unitOfWork.plaidItems.update(itemId, {
-                syncStatus: 'good' as any,
+                syncStatus: goodStatus,
                 lastSuccessfulSync: new Date(),
                 lastSyncErrorMessage: undefined
             });
@@ -72,8 +75,9 @@ export class PlaidSyncService {
         unitOfWork: UnitOfWork
     ): Promise<void> {
         await unitOfWork.executeTransaction(async () => {
+            const errorStatus: ItemStatus = requiresRelink ? 'relink_required' : 'error';
             await unitOfWork.plaidItems.update(itemId, {
-                syncStatus: requiresRelink ? 'relink_required' as any : 'error' as any,
+                syncStatus: errorStatus,
                 lastSyncErrorMessage: error
             });
 

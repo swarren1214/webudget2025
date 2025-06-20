@@ -2,6 +2,7 @@
 
 import { Router, Request, Response } from 'express';
 import plaidRouter from './plaid.routes';
+import institutionRouter from './institution.routes';
 
 const router = Router();
 
@@ -10,7 +11,8 @@ router.get('/', (req: Request, res: Response) => {
     res.status(200).json({ message: 'Welcome to the WeBudget API v1' });
 });
 
-// Mount the new Plaid routes under the /plaid path
+// Mount the route modules
 router.use('/plaid', plaidRouter);
+router.use('/institutions', institutionRouter);
 
 export default router;
