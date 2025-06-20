@@ -30,7 +30,7 @@ WORKDIR /usr/src/app
 # Copy package files again
 COPY package*.json ./
 
-# Install ONLY production dependencies (and node-pg-migrate)
+# Install ONLY production dependencies
 RUN npm install --only=production
 
 # Copy the compiled code from the 'builder' stage

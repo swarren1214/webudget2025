@@ -42,7 +42,7 @@ describe('PostgresPlaidItemRepository', () => {
             };
 
             // Mock the direct database query response
-            mockDbClient.query.mockResolvedValueOnce({ rows: [expectedItem] });
+            (mockDbClient.query as jest.Mock).mockResolvedValueOnce({ rows: [expectedItem] });
 
             const result = await repository.create(itemData);
 
@@ -54,7 +54,7 @@ describe('PostgresPlaidItemRepository', () => {
     describe('hasReachedItemLimit', () => {
         it('should return true when limit is reached', async () => {
             // Mock the direct database query response
-            mockDbClient.query.mockResolvedValueOnce({ rows: [{ count: '10' }] });
+            (mockDbClient.query as jest.Mock).mockResolvedValueOnce({ rows: [{ count: '10' }] });
 
             const result = await repository.hasReachedItemLimit('user-123', 10);
 
@@ -64,7 +64,7 @@ describe('PostgresPlaidItemRepository', () => {
 
         it('should return false when under limit', async () => {
             // Mock the direct database query response
-            mockDbClient.query.mockResolvedValueOnce({ rows: [{ count: '5' }] });
+            (mockDbClient.query as jest.Mock).mockResolvedValueOnce({ rows: [{ count: '5' }] });
 
             const result = await repository.hasReachedItemLimit('user-123', 10);
 

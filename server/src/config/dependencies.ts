@@ -52,10 +52,6 @@ export class DependencyContainer {
         return this.repositoryFactory.getBackgroundJobRepository();
     }
 
-    getTransactionManager() {
-        return this.repositoryFactory.getTransactionManager();
-    }
-
     createUnitOfWork() {
         return this.repositoryFactory.createUnitOfWork();
     }
