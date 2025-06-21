@@ -1,5 +1,13 @@
 {
+  // VS Code will show a prompt: “This workspace has recommended extensions”
   "recommendations": [
+    "dbaeumer.vscode-eslint", // Aligns with backend JS/TS lint rules
+    "esbenp.prettier-vscode", // Code formatting to match CI
+    "ms-azuretools.vscode-docker", // Compose/service introspection
+    "redhat.vscode-yaml", // Helpful for docker-compose.yml edits
+    "yzhang.markdown-all-in-one", // Markdown tables, TOC, shortcuts
+    "streetsidesoftware.code-spell-checker", // Catches typos in docs & code
+    "hediet.vscode-drawio", // Edit .drawio diagrams inline
     "bradlc.vscode-tailwindcss"
   ]
 }
