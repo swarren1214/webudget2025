@@ -16,5 +16,34 @@
       "createTheme(?:<\\w+>)?\\s*\\(([^)]*)\\)",
       "{?\\s?[\\w].*:\\s*?[\"'`]([^\"'`]*).*?,?\\s?}?"
     ]
-  ]
+  ],
+  // ---------- Formatting ----------
+  "editor.formatOnSave": true,
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": false
+  },
+  // ---------- ESLint ----------
+  "eslint.enable": true,
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  // ---------- Prettier ----------
+  "prettier.requireConfig": true,
+  // ---------- Spell Checker (cSpell) ----------
+  "cSpell.dictionaryDefinitions": [
+    {
+      "name": "webudget-terms",
+      "path": "./cspell.json"
+    }
+  ],
+  "cSpell.dictionaries": [
+    "webudget-terms"
+  ],
+  // ---------- Docker ----------
+  "docker.composeCommand": "docker compose",
+  "docker.enableDockerComposeLanguageService": true
 }

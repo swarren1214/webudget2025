@@ -1,0 +1,38 @@
+###############################################################################
+# WeBudget – markdownlint configuration (v0.1)
+#
+# Runs locally via the VS Code “markdownlint” extension and in CI (GitHub
+# Actions). Rules mirror the key requirements in docs/style-guide/README.md.
+###############################################################################
+
+# Enable all default rules, then override selectively
+default: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Line length
+MD013:
+  line_length: 120      # Match style-guide soft wrap
+  ignore_code_blocks: true
+  tables: false
+  headings: false
+
+# Ordered list marker style (1. 2. 3.)
+MD029:
+  style: ordered
+
+# File must start with a single H1
+MD041:
+  level: 1
+  front_matter: false
+
+# Allow inline HTML when absolutely necessary (for details/summary blocks)
+MD033: false
+
+# Prevent duplicate headings within a single file
+MD024:
+  allow_different_nesting: true
+
+# Trailing whitespace not allowed
+MD009:
+  br_spaces: 2          # Permit up to 2 for line breaks
+  strict: false
