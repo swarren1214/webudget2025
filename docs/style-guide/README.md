@@ -1,6 +1,6 @@
 # WeBudget Documentation Style Guide
 
-> **Status:** Draft v0.1 – Last updated YYYY-MM-DD  
+> **Status:** Draft v0.1 – Last updated 2025-06-20  
 > This guide codifies tone, grammar, formatting, and code-block conventions for all WeBudget backend documentation.
 
 ## 1. Purpose

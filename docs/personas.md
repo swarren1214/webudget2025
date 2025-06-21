@@ -1,7 +1,7 @@
 # Audience Personas – Backend Documentation
 
 > **Scope:** Backend contributors only (Phase 0).  
-> **Version:** v0.1 • Created YYYY-MM-DD
+> **Version:** v0.1 • Created 2025-06-20
 
 ## 1. Purpose
 Clarify “who we write for” so that every tutorial, guide, or reference page serves an explicit need and uses the right depth of explanation.
