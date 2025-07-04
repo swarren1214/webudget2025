@@ -1,14 +1,18 @@
+// --- a/server/src/middleware/auth.middleware.ts
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'test-secret';
+const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-dev-secret';
+
 // server/src/middleware/auth.middleware.ts
 
 import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
 import { UnauthorizedError } from '../utils/errors';
 
-const { JWT_SECRET } = process.env;
-
-if (!JWT_SECRET) {
-    throw new Error('FATAL_ERROR: JWT_SECRET is not defined.');
-}
+// const { JWT_SECRET } = process.env;
+//
+// if (!JWT_SECRET) {
+//     throw new Error('FATAL_ERROR: JWT_SECRET is not defined.');
+// }
 
 interface JwtPayload {
     sub: string;
@@ -35,10 +39,12 @@ export const authMiddleware = (
         }
 
         const token = authHeader.split(' ')[1];
-        const decoded = verify(token, JWT_SECRET) as JwtPayload;
+        // JWT_SECRET is not defined; this middleware is deprecated if using Auth0 only.
+        // const decoded = verify(token, JWT_SECRET) as JwtPayload;
+        throw new UnauthorizedError('JWT authentication is disabled. Use Auth0.');
 
         // Cast to AuthRequest when setting user
-        (req as AuthRequest).user = { id: decoded.sub };
+
 
         next();
     } catch (error) {

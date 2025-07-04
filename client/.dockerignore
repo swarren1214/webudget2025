@@ -1,0 +1,15 @@
+# Git files
+.git
+.gitignore
+
+# Local environment variables
+.env*
+
+# Node dependencies (we install these inside the container)
+node_modules
+
+# Compiled output (we create this inside the container)
+dist
+
+# Logs
+npm-debug.log*

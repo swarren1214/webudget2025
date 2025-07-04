@@ -4,9 +4,11 @@ import { Menu, Bell, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type User } from "@shared/schema";
-import { Navbar, DarkThemeToggle, Dropdown, DropdownItem } from "flowbite-react";
+import { Navbar, DarkThemeToggle, Dropdown } from "flowbite-react";
 import { useState } from "react";
+import { LoginButton, LogoutButton } from "@/components/ui/AuthButtons";
 import ProfileModal from "@/components/modals/ProfileModal";
+import { supabase } from "@/lib/supabaseClient";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -14,11 +16,34 @@ interface HeaderProps {
 
 function Header({ onMenuClick }: HeaderProps) {
   // Fetch user data
-  const { data: user, isLoading } = useQuery<User>({
+  const { data: user, isLoading, error } = useQuery<User>({
     queryKey: ['/api/users/me'],
+    queryFn: async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data?.user) throw error ?? new Error("User not found");
+
+      return {
+        id: data.user.id,
+        email: data.user.email ?? "jane@example.com",
+        fullName:
+          data.user.user_metadata?.fullName ||
+          data.user.user_metadata?.name ||
+          "Jane Patel",
+      };
+    },
   });
-  
+
   const [profileOpen, setProfileOpen] = useState(false);
+  const fullName = user?.fullName || '';
+  const [firstName = 'Jane', lastName = 'Patel'] = fullName.split(' ');
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-600 bg-red-100 border border-red-300 rounded">
+        Error loading user data.
+      </div>
+    );
+  }
 
   return (
     <Navbar fluid className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-8 py-4">
@@ -34,9 +59,11 @@ function Header({ onMenuClick }: HeaderProps) {
             <Menu className="h-5 w-5" />
           </Button>
         </div>
+
         {/* Right: All header items */}
         <div className="flex items-center gap-4 justify-end flex-1">
           <DarkThemeToggle />
+
           <Dropdown
             arrowIcon={false}
             inline
@@ -67,7 +94,7 @@ function Header({ onMenuClick }: HeaderProps) {
               <span className="text-sm text-primary-600 dark:text-primary-500">View All</span>
             </div>
           </Dropdown>
-          
+
           {isLoading ? (
             <div className="flex items-center">
               <Skeleton className="h-10 w-10 rounded-full" />
@@ -98,33 +125,38 @@ function Header({ onMenuClick }: HeaderProps) {
                 <span className="block text-sm font-medium">My Account</span>
                 <span className="block truncate text-xs text-gray-500 dark:text-gray-400">{user?.email || 'jane@example.com'}</span>
               </div>
-              <DropdownItem icon={UserIcon} className="flex items-center gap-2" onClick={() => setProfileOpen(true)}>
+              <Dropdown.Item icon={UserIcon} className="flex items-center gap-2" onClick={() => setProfileOpen(true)}>
                 Profile
-              </DropdownItem>
-              <DropdownItem icon={Settings} className="flex items-center gap-2">
+              </Dropdown.Item>
+              <Dropdown.Item icon={Settings} className="flex items-center gap-2">
                 Settings
-              </DropdownItem>
+              </Dropdown.Item>
               <div className="my-1 border-t border-gray-200 dark:border-gray-700"></div>
-              <DropdownItem icon={LogOut} className="flex items-center gap-2">
-                Log out
-              </DropdownItem>
+              <div className="px-4 py-2">
+                <LoginButton />
+                <LogoutButton />
+              </div>
             </Dropdown>
           )}
         </div>
       </div>
-      <ProfileModal
-        isOpen={profileOpen}
-        onClose={() => setProfileOpen(false)}
-        user={{
-          firstName: user?.fullName?.split(' ')[0] || 'Jane',
-          lastName: user?.fullName?.split(' ')[1] || 'Patel',
-          email: user?.email || 'jane@example.com',
-          phone: '',
-          photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-        }}
-        onSave={async () => {}}
-        onDelete={async () => {}}
-      />
+
+      {/* Profile Modal only if user is loaded */}
+      {user && (
+        <ProfileModal
+          isOpen={profileOpen}
+          onClose={() => setProfileOpen(false)}
+          user={{
+            firstName: firstName || 'Jane',
+            lastName: lastName || 'Patel',
+            email: user.email,
+            phone: '',
+            photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
+          }}
+          onSave={async () => {}}
+          onDelete={async () => {}}
+        />
+      )}
     </Navbar>
   );
 }
