@@ -8,6 +8,9 @@ import Accounts from "@/pages/Accounts";
 import Transactions from "@/pages/Transactions";
 import Budgets from "@/pages/Budgets";
 import Transfers from "@/pages/Transfers";
+ import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from "./lib/queryClient";
+
 
 // Auth guard (optional, if you have one)
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -23,10 +26,10 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
+      <QueryClientProvider client={queryClient}>
       <Switch>
         <Route path="/login" component={LoginPage} />
         <Route>
-          {/* All protected routes are wrapped in Layout */}
           <RequireAuth>
             <Layout>
               <Switch>
@@ -44,6 +47,7 @@ export default function App() {
           </RequireAuth>
         </Route>
       </Switch>
+      </QueryClientProvider>
     </AuthProvider>
   );
 }
