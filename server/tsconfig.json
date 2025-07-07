@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",                      // Modern JavaScript output
-    "module": "ESNext",                      // Vite uses ES modules, not CommonJS
+    "module": "commonjs",
     "moduleResolution": "Node",              // Allow resolution via node_modules
     "baseUrl": ".",                          // Relative to /client
     "paths": {
