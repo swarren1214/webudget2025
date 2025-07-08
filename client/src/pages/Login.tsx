@@ -4,14 +4,25 @@ import { useLocation } from 'wouter';
 
 const providers = [
 	{
-		name: 'Google',
-        id: 'google',
-        color: 'bg-white text-[#000000] hover:bg-gray-100 border border-gray-300',
+		name: 'Apple',
+		id: 'apple',
+		color: 'bg-black text-white hover:bg-gray-900',
 		icon: (
-			<svg
-				className="w-5 h-5 mr-2"
-				viewBox="0 0 48 48"
-			>
+			<svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+				<path
+					fill="currentColor"
+					d="M16.365 1.43c0 1.14-.415 2.054-1.245 2.743-.835.692-1.775 1.104-2.82 1.236a1.96 1.96 0 0 1-.184-.808c0-1.04.413-1.963 1.24-2.768.83-.804 1.768-1.21 2.81-1.22.02.273.03.53.03.783zM20.652 16.598c-.156.363-.316.698-.48 1.006a9.268 9.268 0 0 1-.654 1.055 6.385 6.385 0 0 1-.823.982c-.274.293-.56.545-.855.757-.29.204-.59.383-.9.537a4.567 4.567 0 0 1-1.142.361 5.505 5.505 0 0 1-1.172.123c-.367 0-.743-.04-1.127-.12a4.5 4.5 0 0 1-1.16-.375c-.325-.152-.64-.33-.946-.537-.307-.21-.606-.457-.9-.74a6.847 6.847 0 0 1-1.17-1.48c-.296-.46-.546-.91-.75-1.35a12.794 12.794 0 0 1-.615-1.402 11.373 11.373 0 0 1-.51-1.502 6.093 6.093 0 0 1-.218-1.388c0-.491.092-.96.276-1.41.18-.445.428-.848.745-1.21a2.69 2.69 0 0 1 1.064-.753c.408-.15.855-.206 1.343-.168.481.038.93.18 1.343.426.414.25.748.543 1.005.878.263.33.509.723.745 1.182.107.207.198.412.276.614.078.202.144.37.196.502.063.173.13.347.202.52.073.173.14.343.202.51.045.113.105.258.18.432a6.198 6.198 0 0 1 .276-.485 4.83 4.83 0 0 1 .4-.53c.15-.183.35-.368.6-.553.25-.186.52-.336.81-.45.295-.12.606-.187.933-.2a3.39 3.39 0 0 1 1.37.3c.443.207.81.536 1.1.99.13.19.258.41.384.655.126.245.234.505.323.78.09.277.16.536.21.78.052.245.078.49.078.735a5.256 5.256 0 0 1-.33 1.44z"
+				/>
+			</svg>
+		),
+	},
+	
+	{
+		name: 'Google',
+		id: 'google',
+		color: 'bg-white text-[#000000] hover:bg-gray-100 border border-gray-300',
+		icon: (
+			<svg className="w-5 h-5 mr-2" viewBox="0 0 48 48">
 				<g>
 					<path
 						fill="#4285F4"
@@ -33,22 +44,6 @@ const providers = [
 			</svg>
 		),
 	},
-	{
-		name: 'GitHub',
-		id: 'github',
-		color: 'bg-gray-800',
-		icon: (
-			<svg
-				className="w-5 h-5 mr-2"
-				viewBox="0 0 24 24"
-			>
-				<path
-					fill="white"
-					d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.504.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.004.07 1.532 1.032 1.532 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.339-2.221-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.025A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.295 2.748-1.025 2.748-1.025.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.847-2.337 4.695-4.566 4.944.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.577.688.479C21.138 20.2 24 16.447 24 12.021 24 6.484 19.523 2 12 2z"
-				/>
-			</svg>
-		),
-	},
 ];
 
 const LoginPage: React.FC = () => {
@@ -64,19 +59,16 @@ const LoginPage: React.FC = () => {
 		setLoading(true);
 		setError(null);
 		setSuccess(false);
-		const { error } = await supabase.auth.signInWithPassword({
-			email,
-			password,
-		});
+		const { error } = await supabase.auth.signInWithPassword({ email, password });
 		if (error) setError(error.message);
 		else {
 			setSuccess(true);
-			navigate('/dashboard'); // Redirect on success
+			navigate('/dashboard');
 		}
 		setLoading(false);
 	};
 
-	const handleOAuth = async (provider: 'google' | 'github') => {
+	const handleOAuth = async (provider: 'google' | 'apple') => {
 		setLoading(true);
 		setError(null);
 		setSuccess(false);
@@ -90,23 +82,12 @@ const LoginPage: React.FC = () => {
 			<div className="flex flex-1 items-center justify-center">
 				<div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md mx-4">
 					<div className="flex flex-col items-center mb-6">
-						<img
-							src="/appicon-rounded.png"
-							alt="WeBudget Logo"
-							className="w-16 h-16 mb-2"
-                        />
-                        <p className="text-gray-600">
-							Welcome to WeBudget.  Please sign in to continue.
-						</p>
+						<img src="/appicon-rounded.png" alt="WeBudget Logo" className="w-16 h-16 mb-2" />
+						<p className="text-gray-600">Welcome to WeBudget. Please sign in to continue.</p>
 					</div>
-					<form
-						onSubmit={handleLogin}
-						className="space-y-4"
-					>
+					<form onSubmit={handleLogin} className="space-y-4">
 						<div>
-							<label className="block text-sm font-medium text-gray-700 mb-1">
-								Email
-							</label>
+							<label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
 							<input
 								type="email"
 								placeholder="yourname@example.com"
@@ -117,9 +98,7 @@ const LoginPage: React.FC = () => {
 							/>
 						</div>
 						<div>
-							<label className="block text-sm font-medium text-gray-700 mb-1">
-								Password
-							</label>
+							<label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
 							<input
 								type="password"
 								placeholder="Password"
@@ -129,14 +108,8 @@ const LoginPage: React.FC = () => {
 								required
 							/>
 						</div>
-						{error && (
-							<div className="text-red-600 text-sm text-center">{error}</div>
-						)}
-						{success && (
-							<div className="text-green-600 text-sm text-center">
-								Login successful!
-							</div>
-						)}
+						{error && <div className="text-red-600 text-sm text-center">{error}</div>}
+						{success && <div className="text-green-600 text-sm text-center">Login successful!</div>}
 						<button
 							type="submit"
 							className="w-full py-2 px-4 bg-big-grinch text-white rounded-lg font-semibold hover:bg-blue-700 transition"
@@ -147,26 +120,32 @@ const LoginPage: React.FC = () => {
 					</form>
 					<div className="my-6 flex items-center justify-center">
 						<span className="h-px w-16 bg-gray-200" />
-						<span className="mx-4 text-gray-400 text-sm">
-							or continue with
-						</span>
+						<span className="mx-4 text-gray-400 text-sm">or continue with</span>
 						<span className="h-px w-16 bg-gray-200" />
 					</div>
 					<div className="flex flex-col gap-2">
 						{providers.map((p) => (
 							<button
 								key={p.id}
-								onClick={() => handleOAuth(p.id as 'google' | 'github')}
-								className={`flex items-center justify-center w-full py-2 px-4 ${p.color} text-white rounded-lg font-semibold hover:opacity-90 transition`}
+								onClick={() => handleOAuth(p.id as 'google' | 'apple')}
+								className={`flex items-center justify-center w-full py-2 px-4 ${p.color} rounded-lg font-semibold hover:opacity-90 transition`}
 								disabled={loading}
 							>
 								{p.icon}Continue with {p.name}
 							</button>
 						))}
 					</div>
+
+					{/* ✅ Sign Up Section */}
+					<div className="mt-6 text-center text-sm text-gray-600">
+						Don't have an account?{' '}
+						<a href="/signup" className="text-blue-600 hover:underline font-medium">
+							Sign Up
+						</a>
+					</div>
 				</div>
 			</div>
-			<div className="py-6 text-gray-400 text-xs text-center">
+			<div className="py-6 text-white text-xs text-center">
 				&copy; {new Date().getFullYear()} WeBudget. All rights reserved.
 			</div>
 		</div>

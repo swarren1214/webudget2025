@@ -52,7 +52,6 @@ function Header({ onMenuClick }: HeaderProps) {
       className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-8 py-4"
     >
       <div className="flex items-center justify-between w-full">
-        {/* Mobile Menu Button */}
         <div className="flex-1">
           <Button
             variant="ghost"
@@ -64,25 +63,22 @@ function Header({ onMenuClick }: HeaderProps) {
           </Button>
         </div>
 
-        {/* Right Section */}
         <div className="flex items-center gap-4 justify-end flex-1">
           <DarkThemeToggle />
 
-          {/* Notification Icon */}
+          {/* ✅ Fixed button-in-button warning here */}
           <Dropdown
             arrowIcon={false}
             inline
             label={
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full relative"
+              <div
+                className="rounded-full relative p-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
               >
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-0 right-0 h-4 w-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
                   2
                 </span>
-              </Button>
+              </div>
             }
           >
             <div className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -164,7 +160,6 @@ function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      {/* Profile Modal */}
       <ProfileModal
         isOpen={profileOpen}
         onClose={() => setProfileOpen(false)}

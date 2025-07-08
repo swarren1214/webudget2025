@@ -1,19 +1,19 @@
-import { pgTable, text, serial, integer, boolean, timestamp, real } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // User table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  supabase_user_id: uuid("supabase_user_id").notNull().unique(), // new foreign key to auth.users
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
+  supabase_user_id: true,
   username: true,
-  password: true,
   email: true,
   fullName: true,
 });
