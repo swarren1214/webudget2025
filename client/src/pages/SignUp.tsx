@@ -5,6 +5,7 @@ import { useLocation } from 'wouter';
 const SignUpPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,41 +18,43 @@ const SignUpPage: React.FC = () => {
     setError(null);
     setSuccess(false);
 
-    // Step 1: Check if the email already exists in the users table
-    const { data: existingUser, error: existingUserError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (existingUser && !existingUserError) {
-      setError('An account with this email already exists.');
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       setLoading(false);
       return;
     }
 
-    // Step 2: Create Supabase auth account
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { fullName, username: email }, // use email as username
+        data: { fullName, username: email },
       },
     });
 
-    if (authError || !authData?.user) {
-      setError(authError?.message || 'Failed to create account.');
+    if (authError) {
+      setError(authError.message || 'Failed to create account.');
       setLoading(false);
       return;
     }
 
-    // Step 3: Insert into users table (no password!)
+    // Step 2: Get user ID from session (more reliable)
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+
+    if (sessionError || !userId) {
+      setError('Could not retrieve session. Please try again.');
+      setLoading(false);
+      return;
+    }
+
+    // Step 3: Insert user into "users" table
     const { error: insertError } = await supabase.from('users').insert([
       {
         username: email,
         email,
         full_name: fullName,
-        supabase_user_id: authData.user.id,
+        supabase_user_id: userId,
       },
     ]);
 
@@ -62,7 +65,7 @@ const SignUpPage: React.FC = () => {
     }
 
     setSuccess(true);
-    navigate('/dashboard');
+    navigate('/onboarding');
     setLoading(false);
   };
 
@@ -104,6 +107,17 @@ const SignUpPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter Password"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                 required
               />

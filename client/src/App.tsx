@@ -3,35 +3,51 @@ import { AuthProvider } from "@/lib/AuthProvider";
 import { Route, Switch, Redirect } from "wouter";
 import Layout from "@/components/layout/Layout";
 import LoginPage from "@/pages/Login";
-import SignUpPage from "@/pages/SignUp"; // ✅ Added import
+import SignUpPage from "@/pages/SignUp";
 import Dashboard from "@/pages/Dashboard";
 import Accounts from "@/pages/Accounts";
 import Transactions from "@/pages/Transactions";
 import Budgets from "@/pages/Budgets";
 import Transfers from "@/pages/Transfers";
+import Onboarding from "@/pages/Onboarding"; // ✅ Onboarding import
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { supabase } from "@/lib/supabaseClient";
 
-// ✅ Real auth guard using Supabase session
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setIsAuthenticated(!!data?.session);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+      setIsAuthenticated(!!session);
+
+      if (session?.user?.id) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("has_onboarded")
+          .eq("supabase_user_id", session.user.id)
+          .single();
+
+        setHasOnboarded(userData?.has_onboarded ?? false);
+      }
     };
 
     checkSession();
   }, []);
 
-  if (isAuthenticated === null) {
-    return <div>Loading...</div>; // or your loading skeleton
+  if (isAuthenticated === null || hasOnboarded === null) {
+    return <div>Loading...</div>;
   }
 
   if (!isAuthenticated) {
     return <Redirect to="/login" />;
+  }
+
+  if (!hasOnboarded) {
+    return <Redirect to="/onboarding" />;
   }
 
   return <>{children}</>;
@@ -42,8 +58,13 @@ export default function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <Switch>
+          {/* Public Routes */}
           <Route path="/login" component={LoginPage} />
-          <Route path="/signup" component={SignUpPage} /> {/* ✅ New public route */}
+          <Route path="/signup" component={SignUpPage} />
+          <Route path="/onboarding" component={Onboarding} /> {/* ✅ New onboarding route */}
+          <Route path="/" component={() => <Redirect to="/login" />} />
+
+          {/* Protected Routes */}
           <Route>
             <RequireAuth>
               <Layout>
@@ -53,7 +74,6 @@ export default function App() {
                   <Route path="/transactions" component={Transactions} />
                   <Route path="/budgets" component={Budgets} />
                   <Route path="/transfers" component={Transfers} />
-                  <Route path="/" component={() => <Redirect to="/dashboard" />} />
                   <Route>Page not found</Route>
                 </Switch>
               </Layout>

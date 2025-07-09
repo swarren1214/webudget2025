@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
+  has_onboarded: boolean("has_onboarded").default(false),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
