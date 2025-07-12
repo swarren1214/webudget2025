@@ -17,6 +17,7 @@ const envSchema = z.object({
     PLAID_CLIENT_ID: z.string().min(1, { message: 'PLAID_CLIENT_ID is a required field' }),
     PLAID_SECRET: z.string().min(1, { message: 'PLAID_SECRET is a required field' }),
     PLAID_ENV: z.enum(['sandbox', 'development', 'production']),
+    SUPABASE_JWT_SECRET: z.string().min(1, { message: 'SUPABASE_JWT_SECRET is a required field' }),
 });
 
 let config: z.infer<typeof envSchema>;

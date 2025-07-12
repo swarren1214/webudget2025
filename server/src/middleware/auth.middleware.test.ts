@@ -55,14 +55,4 @@ describe('Supabase Auth Middleware', () => {
         expect(mockRequest.user.sub).toEqual(userId);
     });
 });
-/* Removed custom expect function that was shadowing Jest's global expect */
-
-// tsconfig.json
-
-{
-  "compilerOptions": {
-    // ...other options...
-    "types": ["jest", "node"]
-  }
-}
 

@@ -11,6 +11,7 @@ process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef01
 process.env.PLAID_CLIENT_ID = 'test-client-id';
 process.env.PLAID_SECRET = 'test-secret';
 process.env.PLAID_ENV = 'sandbox';
+process.env.SUPABASE_JWT_SECRET = 'test-supabase-jwt-secret-for-testing-only';
 
 // Dynamically build the database URL for tests from the loaded .env variables
 // This ensures the test suite connects with the correct, user-defined credentials.
