@@ -39,8 +39,8 @@ describe('Plaid Integration Tests: POST /api/v1/plaid/exchange-public-token', ()
         app.use(mainRouter);
         app.use(errorHandler);
 
-        const JWT_SECRET = process.env.JWT_SECRET as string;
-        validToken = sign({ sub: testUserId }, JWT_SECRET, { expiresIn: '1h' });
+        const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET as string;
+        validToken = sign({ sub: testUserId }, SUPABASE_JWT_SECRET, { expiresIn: '1h' });
     });
 
     // This block runs before each test to ensure the user exists

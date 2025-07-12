@@ -1,7 +1,3 @@
-// --- a/server/src/middleware/auth.middleware.ts
-const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || 'test-secret';
-const secret = process.env.SUPABASE_JWT_SECRET || 'fallback-dev-secret';
-
 // server/src/middleware/auth.middleware.ts
 
 import { Request, Response, NextFunction } from 'express';
@@ -9,26 +5,27 @@ import { verify } from 'jsonwebtoken';
 import { UnauthorizedError } from '../utils/errors';
 import config from '../config/env';
 
-// const { JWT_SECRET } = process.env;
-//
-// if (!JWT_SECRET) {
-//     throw new Error('FATAL_ERROR: JWT_SECRET is not defined.');
-// }
-
-interface JwtPayload {
+interface SupabaseJwtPayload {
     sub: string;
+    email?: string;
+    aud?: string;
+    role?: string;
+    iat?: number;
+    exp?: number;
 }
 
 // Extend the Express Request type properly
 export interface AuthRequest extends Request {
     user?: {
         id: string;
+        email?: string;
+        role?: string;
     };
 }
 
-// Fix the type casting issue
+// Main authentication middleware using Supabase JWT
 export const authMiddleware = (
-    req: Request, // Use base Request type here
+    req: Request,
     res: Response,
     next: NextFunction
 ) => {
@@ -40,15 +37,31 @@ export const authMiddleware = (
         }
 
         const token = authHeader.split(' ')[1];
-        // JWT_SECRET is not defined; this middleware is deprecated if using Auth0 only.
-        // const decoded = verify(token, config.JWT_SECRET) as JwtPayload;
-        throw new UnauthorizedError('JWT authentication is disabled. Use Auth0.');
-
-        // Cast to AuthRequest when setting user
-
+        
+        // Verify the token using the Supabase JWT secret
+        const decoded = verify(token, config.SUPABASE_JWT_SECRET) as SupabaseJwtPayload;
+        
+        // Cast to AuthRequest and attach user info
+        const authReq = req as AuthRequest;
+        authReq.user = {
+            id: decoded.sub,
+            email: decoded.email,
+            role: decoded.role
+        };
 
         next();
     } catch (error) {
-        next(new UnauthorizedError('Invalid or expired token.'));
+        // Handle JWT verification errors
+        if (error instanceof Error) {
+            if (error.name === 'TokenExpiredError') {
+                next(new UnauthorizedError('Token has expired.'));
+            } else if (error.name === 'JsonWebTokenError') {
+                next(new UnauthorizedError('Invalid token format.'));
+            } else {
+                next(new UnauthorizedError('Token verification failed.'));
+            }
+        } else {
+            next(new UnauthorizedError('Invalid or expired token.'));
+        }
     }
 };
