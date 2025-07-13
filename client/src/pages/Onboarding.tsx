@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
 
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState(1);
@@ -8,10 +9,51 @@ const OnboardingPage: React.FC = () => {
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [linkToken, setLinkToken] = useState<string | null>(null);
 
+  // 🐛 DEBUG: Session state on component mount
+  useEffect(() => {
+    console.log('🔍 [Onboarding] Component mounted - checking session state...');
+    const checkSession = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('🔍 [Onboarding] Session on mount:', {
+        hasSession: !!sessionData.session,
+        userId: sessionData.session?.user?.id,
+        hasAccessToken: !!sessionData.session?.access_token,
+        accessTokenLength: sessionData.session?.access_token?.length,
+        userEmail: sessionData.session?.user?.email,
+        timestamp: new Date().toISOString()
+      });
+    };
+    checkSession();
+  }, []);
+
   // Get link token when step 2 is reached
   useEffect(() => {
     if (step === 2 && !linkToken) {
-      createPlaidLinkToken().then(data => setLinkToken(data.link_token));
+      console.log('🔍 [Onboarding] Step 2 reached - BEFORE createPlaidLinkToken API call...');
+      
+      // Check session again right before API call
+      const checkSessionBeforeAPI = async () => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        console.log('🔍 [Onboarding] Session RIGHT BEFORE API call:', {
+          hasSession: !!sessionData.session,
+          userId: sessionData.session?.user?.id,
+          hasAccessToken: !!sessionData.session?.access_token,
+          accessTokenLength: sessionData.session?.access_token?.length,
+          timestamp: new Date().toISOString()
+        });
+
+        // Now make the API call
+        try {
+          console.log('🔍 [Onboarding] CALLING createPlaidLinkToken now...');
+          const data = await createPlaidLinkToken();
+          console.log('🔍 [Onboarding] createPlaidLinkToken SUCCESS:', data);
+          setLinkToken(data.link_token);
+        } catch (error) {
+          console.error('🔍 [Onboarding] createPlaidLinkToken FAILED:', error);
+        }
+      };
+
+      checkSessionBeforeAPI();
     }
   }, [step, linkToken]);
 

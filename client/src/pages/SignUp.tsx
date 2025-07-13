@@ -24,6 +24,16 @@ const SignUpPage: React.FC = () => {
       return;
     }
 
+    // 🐛 DEBUG: Before signup API call
+    console.log('🔍 [SignUp] BEFORE signup API call - checking current session...');
+    const { data: preSignupSession } = await supabase.auth.getSession();
+    console.log('🔍 [SignUp] Pre-signup session:', {
+      hasSession: !!preSignupSession.session,
+      userId: preSignupSession.session?.user?.id,
+      hasAccessToken: !!preSignupSession.session?.access_token,
+      timestamp: new Date().toISOString()
+    });
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -32,23 +42,47 @@ const SignUpPage: React.FC = () => {
       },
     });
 
+    // 🐛 DEBUG: Immediately after successful signup
+    console.log('🔍 [SignUp] AFTER signup API call:', {
+      authData,
+      authError,
+      hasUser: !!authData?.user,
+      userConfirmed: authData?.user?.email_confirmed_at,
+      timestamp: new Date().toISOString()
+    });
+
     if (authError) {
+      console.log('🔍 [SignUp] Signup failed:', authError);
       setError(authError.message || 'Failed to create account.');
       setLoading(false);
       return;
     }
 
     // Step 2: Get user ID from session (more reliable)
+    console.log('🔍 [SignUp] BEFORE getSession call...');
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     const userId = sessionData?.session?.user?.id;
 
+    // 🐛 DEBUG: After getting session
+    console.log('🔍 [SignUp] AFTER getSession call:', {
+      hasSession: !!sessionData.session,
+      userId: userId,
+      hasAccessToken: !!sessionData.session?.access_token,
+      accessTokenLength: sessionData.session?.access_token?.length,
+      sessionError,
+      userEmail: sessionData.session?.user?.email,
+      timestamp: new Date().toISOString()
+    });
+
     if (sessionError || !userId) {
+      console.log('🔍 [SignUp] Session retrieval failed:', { sessionError, userId });
       setError('Could not retrieve session. Please try again.');
       setLoading(false);
       return;
     }
 
     // Step 3: Insert user into "users" table
+    console.log('🔍 [SignUp] BEFORE database user insert...');
     const { error: insertError } = await supabase.from('users').insert([
       {
         username: email,
@@ -58,13 +92,32 @@ const SignUpPage: React.FC = () => {
       },
     ]);
 
+    // 🐛 DEBUG: After database insert
+    console.log('🔍 [SignUp] AFTER database user insert:', {
+      insertError,
+      timestamp: new Date().toISOString()
+    });
+
     if (insertError) {
+      console.log('🔍 [SignUp] Database insert failed:', insertError);
       setError(insertError.message);
       setLoading(false);
       return;
     }
 
+    // 🐛 DEBUG: Before navigation to onboarding
+    console.log('🔍 [SignUp] BEFORE navigate to onboarding - final session check...');
+    const { data: finalSession } = await supabase.auth.getSession();
+    console.log('🔍 [SignUp] Final session before navigation:', {
+      hasSession: !!finalSession.session,
+      userId: finalSession.session?.user?.id,
+      hasAccessToken: !!finalSession.session?.access_token,
+      accessTokenLength: finalSession.session?.access_token?.length,
+      timestamp: new Date().toISOString()
+    });
+
     setSuccess(true);
+    console.log('🔍 [SignUp] NAVIGATING to /onboarding now...');
     navigate('/onboarding');
     setLoading(false);
   };

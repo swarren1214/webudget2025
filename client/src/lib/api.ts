@@ -126,16 +126,16 @@ export const getTransfer = async (id: number): Promise<Transfer> => {
 
 // Plaid API functions
 export const createPlaidLinkToken = async (): Promise<{ link_token: string }> => {
-  const res = await apiRequest("POST", "/api/plaid/create-link-token");
+  const res = await apiRequest("POST", "/plaid/create-link-token");
   return res.json();
 };
 
 export const exchangePlaidPublicToken = async (publicToken: string, accountId: number): Promise<{ message: string }> => {
-  const res = await apiRequest("POST", "/api/plaid/exchange-token", { publicToken, accountId });
+  const res = await apiRequest("POST", "/plaid/exchange-public-token", { publicToken, accountId });
   return res.json();
 };
 
 export const syncTransactions = async (accountId: number): Promise<{ message: string }> => {
-  const res = await apiRequest("POST", `/api/plaid/sync-transactions`, { accountId });
+  const res = await apiRequest("POST", `/plaid/sync-transactions`, { accountId });
   return res.json();
 };
