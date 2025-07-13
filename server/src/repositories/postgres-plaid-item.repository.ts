@@ -52,6 +52,17 @@ export class PostgresPlaidItemRepository implements PlaidItemRepository {
         return result.rows[0] || null;
     }
 
+    async findByIdAndUserId(id: number, userId: string): Promise<PlaidItem | null> {
+        // Optimized query that combines ID lookup with user ownership check
+        const query = `
+            SELECT * FROM plaid_items 
+            WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+        `;
+
+        const result = await this.db.query(query, [id, userId]);
+        return result.rows[0] || null;
+    }
+
     async findByUserId(userId: string): Promise<PlaidItem[]> {
         const query = `
             SELECT * FROM plaid_items 

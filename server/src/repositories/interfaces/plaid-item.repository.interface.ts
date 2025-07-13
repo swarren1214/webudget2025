@@ -43,6 +43,15 @@ export interface PlaidItemRepository {
     findById(id: number): Promise<PlaidItem | null>;
 
     /**
+     * Finds a Plaid item by its internal ID and user ID in a single query
+     * This is more efficient than separate findById + ownership check
+     * @param id - The internal database ID
+     * @param userId - The user's ID who should own the item
+     * @returns The Plaid item or null if not found or not owned by user
+     */
+    findByIdAndUserId(id: number, userId: string): Promise<PlaidItem | null>;
+
+    /**
      * Finds all Plaid items for a specific user
      * @param userId - The user's ID
      * @returns Array of Plaid items (empty array if none found)

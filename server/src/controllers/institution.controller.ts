@@ -4,7 +4,8 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { DependencyContainer } from '../config/dependencies';
 import { getUserInstitutions, archiveInstitution, canLinkAnotherAccount } from '../services/plaid.service';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
+import { getInstitutionForUser, parseInstitutionId } from '../services/institution.service';
+import { NotFoundError } from '../utils/errors';
 import { ItemStatus, PlaidItem } from '../repositories/interfaces/plaid-types';
 
 const container = DependencyContainer.getInstance();
@@ -47,11 +48,7 @@ export const deleteInstitutionHandler = async (
     try {
         const userId = req.user!.id;
         const { institutionId } = req.params;
-        const id = parseInt(institutionId, 10);
-
-        if (isNaN(id)) {
-            throw new NotFoundError('Invalid institution ID');
-        }
+        const id = parseInstitutionId(institutionId);
 
         await archiveInstitution(userId, id, plaidItemRepository);
 
@@ -63,36 +60,7 @@ export const deleteInstitutionHandler = async (
     }
 };
 
-/**
- * Validates and parses institution ID from request parameters
- */
-const validateInstitutionId = (institutionId: string): number => {
-    const id = parseInt(institutionId, 10);
-    if (isNaN(id)) {
-        throw new NotFoundError('Invalid institution ID');
-    }
-    return id;
-};
-
-/**
- * Verifies user ownership of an institution
- */
-const verifyInstitutionOwnership = async (
-    institutionId: number,
-    userId: string
-): Promise<PlaidItem> => {
-    const institution = await plaidItemRepository.findById(institutionId);
-    
-    if (!institution) {
-        throw new NotFoundError('Institution not found');
-    }
-    
-    if (institution.user_id !== userId) {
-        throw new ForbiddenError();
-    }
-    
-    return institution;
-};
+// Helper functions removed - functionality moved to institution.service.ts for better reusability
 
 /**
  * Checks if institution is already syncing and returns appropriate response
@@ -115,11 +83,9 @@ export const refreshInstitutionHandler = async (
         const userId = req.user!.id;
         const { institutionId } = req.params;
 
-        // Validate institution ID
-        const id = validateInstitutionId(institutionId);
-
-        // Verify ownership
-        const institution = await verifyInstitutionOwnership(id, userId);
+        // Validate institution ID and verify ownership in single optimized query
+        const id = parseInstitutionId(institutionId);
+        const institution = await getInstitutionForUser(id, userId, plaidItemRepository);
 
         // Check if already syncing
         if (checkSyncStatus(institution)) {
