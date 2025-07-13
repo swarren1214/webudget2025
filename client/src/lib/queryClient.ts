@@ -1,4 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { supabase } from "./supabaseClient";
+
+// Backend API base URL - in development, the backend runs on port 3000
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000';
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -12,9 +16,27 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  // Get current Supabase session for authentication
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  // Prepare headers
+  const headers: Record<string, string> = {};
+  
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  // Add Authorization header if user is authenticated
+  if (session?.access_token) {
+    headers["Authorization"] = `Bearer ${session.access_token}`;
+  }
+
+  // Construct full URL with API versioning
+  const fullUrl = `${API_BASE_URL}/api/v1${url.startsWith('/') ? url : `/${url}`}`;
+
+  const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,7 +51,22 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    // Get current Supabase session for authentication
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Prepare headers
+    const headers: Record<string, string> = {};
+    
+    // Add Authorization header if user is authenticated
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+
+    // Construct full URL with API versioning
+    const fullUrl = `${API_BASE_URL}/api/v1${(queryKey[0] as string).startsWith('/') ? queryKey[0] : `/${queryKey[0]}`}`;
+
+    const res = await fetch(fullUrl, {
+      headers,
       credentials: "include",
     });
 

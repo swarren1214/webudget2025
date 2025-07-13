@@ -26,8 +26,25 @@ app.use(pinoHttp({
 }));
 
 // --- Global Middleware ---
-// Enable Cross-Origin Resource Sharing
-app.use(cors());
+// Enable Cross-Origin Resource Sharing with development-specific configuration
+app.use(cors({
+  origin: config.NODE_ENV === 'development' 
+    ? ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000']
+    : true, // In production, configure this more restrictively
+  credentials: true,
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type', 
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'X-Request-Id'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  optionsSuccessStatus: 200 // For legacy browser support
+}));
+
 // Enable JSON body parsing
 app.use(express.json());
 
