@@ -1,5 +1,21 @@
 # docker-compose.dev.yml
 services:
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_DB=webudget_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myuser -d webudget_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./server
@@ -11,7 +27,22 @@ services:
       - ./server:/usr/src/app
       # Do not overwrite node_modules with a local empty folder
       - /usr/src/app/node_modules
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=development
       - LOG_LEVEL=debug
- 
+      - PORT=3000
+      - DATABASE_URL=postgresql://myuser:mysecretpassword@db:5432/webudget_db
+      - JWT_SECRET=fallback-jwt-secret-for-compatibility
+      - SUPABASE_JWT_SECRET=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3bmtqaHRpbGpzcHJldG94cnJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0NzczOTEsImV4cCI6MjA2NzA1MzM5MX0.3y7pT_YysdoK8a_1vGSSecxYGorhM28kTSJ-79IWDDM
+      - ENCRYPTION_KEY=9617526FA1198BD31839CD25C59DE618CA708605CA64EE360669A97F346646CA
+      - PLAID_CLIENT_ID=619bb9d73067ce00137c4d69
+      - PLAID_SECRET=978cd31976fe63b2777de3bb82da6a
+      - PLAID_ENV=sandbox
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data: 
