@@ -119,6 +119,7 @@ describe('Plaid Service', () => {
                 last_successful_sync: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
+                archived_at: null,
             };
             (mockUnitOfWork.plaidItems.create as jest.Mock).mockResolvedValue(mockNewPlaidItem);
 
@@ -233,6 +234,7 @@ describe('Plaid Service', () => {
                 last_successful_sync: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
+                archived_at: null,
             };
 
             mockRepository.findById.mockResolvedValue(mockInstitution);
@@ -266,6 +268,7 @@ describe('Plaid Service', () => {
                 last_successful_sync: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
+                archived_at: null,
             };
 
             mockRepository.findById.mockResolvedValue(mockInstitution);

@@ -39,6 +39,7 @@ describe('PostgresPlaidItemRepository', () => {
                 last_successful_sync: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
+                archived_at: null,
             };
 
             // Mock the direct database query response
