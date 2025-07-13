@@ -51,6 +51,12 @@ export const authMiddleware = (
 
         next();
     } catch (error) {
+        // If it's already an UnauthorizedError, pass it through
+        if (error instanceof UnauthorizedError) {
+            next(error);
+            return;
+        }
+
         // Handle JWT verification errors
         if (error instanceof Error) {
             if (error.name === 'TokenExpiredError') {
