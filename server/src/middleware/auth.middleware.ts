@@ -1,7 +1,7 @@
 // server/src/middleware/auth.middleware.ts
 
 import { Request, Response, NextFunction } from 'express';
-import { verify } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { UnauthorizedError } from '../utils/errors';
 import config from '../config/env';
 
@@ -39,7 +39,7 @@ export const authMiddleware = (
         const token = authHeader.split(' ')[1];
         
         // Verify the token using the Supabase JWT secret
-        const decoded = verify(token, config.SUPABASE_JWT_SECRET) as SupabaseJwtPayload;
+        const decoded = jwt.verify(token, config.SUPABASE_JWT_SECRET) as SupabaseJwtPayload;
         
         // Cast to AuthRequest and attach user info
         const authReq = req as AuthRequest;

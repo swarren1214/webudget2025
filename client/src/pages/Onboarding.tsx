@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
+import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/api';
 
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [plaidLinked, setPlaidLinked] = useState(false);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
 
-  // Simulated Plaid token for example purposes
+  // Get link token when step 2 is reached
+  useEffect(() => {
+    if (step === 2 && !linkToken) {
+      createPlaidLinkToken().then(data => setLinkToken(data.link_token));
+    }
+  }, [step, linkToken]);
+
   const { open, ready } = usePlaidLink({
-    token: 'your-generated-link-token',
+    token: linkToken,
     onSuccess: (public_token, metadata) => {
+      exchangePlaidPublicToken(public_token, 1);
       setPlaidLinked(true);
       setStep(step + 1);
     },

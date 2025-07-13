@@ -1,11 +1,9 @@
 // server/src/config/env.ts
-import dotenv from 'dotenv';
-import path from 'path';
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
-// Load environment variables from the root .env file
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Environment variables should be passed in through the process, not loaded from .env
+// The application should be started with the necessary environment variables
 
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
