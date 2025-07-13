@@ -125,7 +125,7 @@ export const getTransfer = async (id: number): Promise<Transfer> => {
 };
 
 // Plaid API functions
-export const createPlaidLinkToken = async (): Promise<{ link_token: string }> => {
+export const createPlaidLinkToken = async (): Promise<{ linkToken: string; expiration: string }> => {
   const res = await apiRequest("POST", "/plaid/create-link-token");
   return res.json();
 };

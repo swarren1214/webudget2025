@@ -47,7 +47,7 @@ const OnboardingPage: React.FC = () => {
           console.log('🔍 [Onboarding] CALLING createPlaidLinkToken now...');
           const data = await createPlaidLinkToken();
           console.log('🔍 [Onboarding] createPlaidLinkToken SUCCESS:', data);
-          setLinkToken(data.link_token);
+          setLinkToken(data.linkToken);
         } catch (error) {
           console.error('🔍 [Onboarding] createPlaidLinkToken FAILED:', error);
         }
@@ -57,14 +57,29 @@ const OnboardingPage: React.FC = () => {
     }
   }, [step, linkToken]);
 
+  // ✅ BEST PRACTICE: Conditional hook initialization to prevent race conditions
+  // usePlaidLink requires a token, so we provide fallback when linkToken is not ready
   const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess: (public_token, metadata) => {
+    token: linkToken || '', // Fallback to empty string when linkToken is null
+    onSuccess: (public_token: string, metadata: any) => {
       exchangePlaidPublicToken(public_token, 1);
       setPlaidLinked(true);
       setStep(step + 1);
     },
   });
+
+  // ✅ IMMUTABLE STATE: Only consider ready when BOTH conditions are met
+  const isPlaidReady = Boolean(linkToken) && ready;
+
+  // Monitor Plaid Link readiness for debugging (remove in production)
+  useEffect(() => {
+    console.log('🔍 [Onboarding] Plaid Link state:', {
+      hasToken: !!linkToken,
+      ready,
+      isPlaidReady,
+      step
+    });
+  }, [linkToken, ready, isPlaidReady, step]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -98,11 +113,21 @@ const OnboardingPage: React.FC = () => {
           <div className="text-center">
             <h2 className="text-xl font-semibold mb-4">Connect Bank Account</h2>
             <button
-              onClick={() => open()}
-              disabled={!ready}
+              onClick={() => {
+                console.log('🔍 [Onboarding] Connect button clicked:', { isPlaidReady });
+                if (isPlaidReady) {
+                  open();
+                }
+              }}
+              disabled={!isPlaidReady}
               className="py-2 px-4 bg-big-grinch text-white rounded-lg font-semibold hover:bg-green-700 transition"
+              style={{ 
+                opacity: !isPlaidReady ? 0.5 : 1,
+                cursor: !isPlaidReady ? 'not-allowed' : 'pointer'
+              }}
             >
               {plaidLinked ? 'Account Linked!' : 'Connect with Plaid'}
+              {!isPlaidReady && <span className="ml-2 text-xs">(Loading...)</span>}
             </button>
           </div>
         );
