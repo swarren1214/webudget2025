@@ -5,7 +5,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { DependencyContainer } from '../config/dependencies';
 import { getUserInstitutions, archiveInstitution, canLinkAnotherAccount } from '../services/plaid.service';
 import { NotFoundError, ForbiddenError } from '../utils/errors';
-import { ItemStatus } from '../repositories/interfaces/plaid-types';
+import { ItemStatus, PlaidItem } from '../repositories/interfaces/plaid-types';
 
 const container = DependencyContainer.getInstance();
 const plaidItemRepository = container.getPlaidItemRepository();
@@ -64,6 +64,45 @@ export const deleteInstitutionHandler = async (
 };
 
 /**
+ * Validates and parses institution ID from request parameters
+ */
+const validateInstitutionId = (institutionId: string): number => {
+    const id = parseInt(institutionId, 10);
+    if (isNaN(id)) {
+        throw new NotFoundError('Invalid institution ID');
+    }
+    return id;
+};
+
+/**
+ * Verifies user ownership of an institution
+ */
+const verifyInstitutionOwnership = async (
+    institutionId: number,
+    userId: string
+): Promise<PlaidItem> => {
+    const institution = await plaidItemRepository.findById(institutionId);
+    
+    if (!institution) {
+        throw new NotFoundError('Institution not found');
+    }
+    
+    if (institution.user_id !== userId) {
+        throw new ForbiddenError();
+    }
+    
+    return institution;
+};
+
+/**
+ * Checks if institution is already syncing and returns appropriate response
+ */
+const checkSyncStatus = (institution: PlaidItem): boolean => {
+    const syncingStatus: ItemStatus = 'syncing';
+    return institution.sync_status === syncingStatus;
+};
+
+/**
  * POST /api/v1/institutions/:institutionId/refresh
  * Trigger a manual refresh for an institution
  */
@@ -75,24 +114,15 @@ export const refreshInstitutionHandler = async (
     try {
         const userId = req.user!.id;
         const { institutionId } = req.params;
-        const id = parseInt(institutionId, 10);
 
-        if (isNaN(id)) {
-            throw new NotFoundError('Invalid institution ID');
-        }
+        // Validate institution ID
+        const id = validateInstitutionId(institutionId);
 
         // Verify ownership
-        const institution = await plaidItemRepository.findById(id);
-        if (!institution) {
-            throw new NotFoundError('Institution not found');
-        }
-        if (institution.user_id !== userId) {
-            throw new ForbiddenError();
-        }
+        const institution = await verifyInstitutionOwnership(id, userId);
 
-        // Check if already syncing - fix the comparison
-        const syncingStatus: ItemStatus = 'syncing';
-        if (institution.sync_status === syncingStatus) {
+        // Check if already syncing
+        if (checkSyncStatus(institution)) {
             res.status(200).json({
                 message: 'Sync already in progress',
                 syncStatus: 'syncing'

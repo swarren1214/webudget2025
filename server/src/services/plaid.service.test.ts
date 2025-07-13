@@ -13,7 +13,7 @@ import {
     archiveInstitution
 } from './plaid.service';
 import { PlaidItemRepository, UnitOfWork, PlaidItem, ItemStatus } from '../repositories/interfaces';
-import { ApiError } from '../utils/errors';
+import { ApiError, ValidationError, ConflictError } from '../utils/errors';
 
 describe('Plaid Service', () => {
     // Mock dependencies
@@ -73,7 +73,7 @@ describe('Plaid Service', () => {
         const mockEncryptedToken = 'encrypted-token-string';
 
         // 2. Define mock implementations of the service's function-based dependencies.
-        const mockPlaidExchange: PlaidExchangeTokenFn = jest.fn().mockResolvedValue(mockPlaidExchangeResponse);
+        const mockPlaidExchangeToken: PlaidExchangeTokenFn = jest.fn().mockResolvedValue(mockPlaidExchangeResponse);
         const mockPlaidItemGet: PlaidItemGetFn = jest.fn().mockResolvedValue(mockItemGetResponse);
         const mockPlaidGetInstitution: PlaidGetInstitutionFn = jest.fn().mockResolvedValue(mockPlaidInstitutionResponse);
         const mockEncrypt: EncryptFn = jest.fn().mockReturnValue(mockEncryptedToken);
@@ -126,7 +126,7 @@ describe('Plaid Service', () => {
             // --- ACT ---
             // Call the service with all its dependencies injected, including our mock UoW.
             const result = await exchangePublicToken(
-                mockPlaidExchange,
+                mockPlaidExchangeToken,
                 mockPlaidItemGet,
                 mockPlaidGetInstitution,
                 mockEncrypt,
@@ -161,13 +161,13 @@ describe('Plaid Service', () => {
         it('should throw an error without calling repositories if Plaid exchange fails', async () => {
             // Arrange: Mock a failure from the Plaid client.
             const plaidError = new Error('Plaid exchange failed');
-            (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(plaidError);
+            (mockPlaidExchangeToken as jest.Mock).mockRejectedValueOnce(plaidError);
 
             // --- ACT & ASSERT ---
             // Expect the service to throw the same error it received from its dependency.
             await expect(
                 exchangePublicToken(
-                    mockPlaidExchange,
+                    mockPlaidExchangeToken,
                     mockPlaidItemGet,
                     mockPlaidGetInstitution,
                     mockEncrypt,
@@ -179,6 +179,304 @@ describe('Plaid Service', () => {
 
             // Assert that no transaction was even attempted.
             expect(mockUnitOfWork.executeTransaction).not.toHaveBeenCalled();
+        });
+
+        describe('Input Validation', () => {
+            it('should throw ValidationError for empty userId', async () => {
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '', // empty userId
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for null userId', async () => {
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        null as any, // null userId
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for non-string userId', async () => {
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        123 as any, // number instead of string
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for invalid userId format', async () => {
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        'invalid-user-id', // invalid format
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+
+                         it('should accept valid UUID userId format', async () => {
+                 const validUuid = '550e8400-e29b-41d4-a716-446655440000';
+                 
+                 // Setup successful flow
+                 (mockPlaidExchangeToken as jest.Mock).mockResolvedValue({
+                     access_token: 'access-token-xyz',
+                     item_id: 'item-id-123',
+                 });
+                 (mockPlaidItemGet as jest.Mock).mockResolvedValue({
+                     item: { institution_id: 'ins_123' },
+                 });
+                 (mockPlaidGetInstitution as jest.Mock).mockResolvedValue({
+                     institution: { name: 'Test Bank' },
+                 });
+                 (mockEncrypt as jest.Mock).mockReturnValue('encrypted-token');
+                 (mockUnitOfWork.executeTransaction as jest.Mock).mockImplementation(async (fn) => fn());
+                 (mockUnitOfWork.plaidItems.create as jest.Mock).mockResolvedValue({
+                     id: 1,
+                     userId: validUuid,
+                     plaidItemId: 'item-id-123',
+                     plaidInstitutionId: 'ins_123',
+                     institutionName: 'Test Bank',
+                     encryptedAccessToken: 'encrypted-token',
+                     syncStatus: 'good',
+                     createdAt: new Date(),
+                     updatedAt: new Date(),
+                 });
+                 (mockUnitOfWork.backgroundJobs.create as jest.Mock).mockResolvedValue(undefined);
+
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        validUuid,
+                        'public-test-token-123456789'
+                    )
+                ).resolves.toBeDefined();
+            });
+
+                         it('should accept valid Auth0 ID userId format', async () => {
+                 const validAuth0Id = 'auth0|507f1f77bcf86cd799439011';
+                 
+                 // Setup successful flow
+                 (mockPlaidExchangeToken as jest.Mock).mockResolvedValue({
+                     access_token: 'access-token-xyz',
+                     item_id: 'item-id-123',
+                 });
+                 (mockPlaidItemGet as jest.Mock).mockResolvedValue({
+                     item: { institution_id: 'ins_123' },
+                 });
+                 (mockPlaidGetInstitution as jest.Mock).mockResolvedValue({
+                     institution: { name: 'Test Bank' },
+                 });
+                 (mockEncrypt as jest.Mock).mockReturnValue('encrypted-token');
+                 (mockUnitOfWork.executeTransaction as jest.Mock).mockImplementation(async (fn) => fn());
+                 (mockUnitOfWork.plaidItems.create as jest.Mock).mockResolvedValue({
+                     id: 1,
+                     userId: validAuth0Id,
+                     plaidItemId: 'item-id-123',
+                     plaidInstitutionId: 'ins_123',
+                     institutionName: 'Test Bank',
+                     encryptedAccessToken: 'encrypted-token',
+                     syncStatus: 'good',
+                     createdAt: new Date(),
+                     updatedAt: new Date(),
+                 });
+                 (mockUnitOfWork.backgroundJobs.create as jest.Mock).mockResolvedValue(undefined);
+
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        validAuth0Id,
+                        'public-test-token-123456789'
+                    )
+                ).resolves.toBeDefined();
+            });
+
+            it('should throw ValidationError for empty publicToken', async () => {
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '550e8400-e29b-41d4-a716-446655440000',
+                        '' // empty publicToken
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for invalid publicToken format', async () => {
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '550e8400-e29b-41d4-a716-446655440000',
+                        'invalid-token' // invalid format
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for short publicToken', async () => {
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '550e8400-e29b-41d4-a716-446655440000',
+                        'public-short' // too short
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+        });
+
+                 describe('Idempotency Protection', () => {
+             it('should throw ConflictError when plaid_item_id already exists', async () => {
+                 const dbError = {
+                     code: '23505',
+                     constraint: 'plaid_items_plaid_item_id_key',
+                     message: 'duplicate key value violates unique constraint'
+                 };
+
+                 (mockPlaidExchangeToken as jest.Mock).mockResolvedValue({
+                     access_token: 'access-token-xyz',
+                     item_id: 'duplicate-item-id-123',
+                 });
+                 (mockPlaidItemGet as jest.Mock).mockResolvedValue({
+                     item: { institution_id: 'ins_123' },
+                 });
+                 (mockPlaidGetInstitution as jest.Mock).mockResolvedValue({
+                     institution: { name: 'Test Bank' },
+                 });
+                 (mockEncrypt as jest.Mock).mockReturnValue('encrypted-token');
+                 
+                 // Mock the transaction to throw a database constraint error
+                 (mockUnitOfWork.executeTransaction as jest.Mock).mockImplementation(async (fn) => fn());
+                 (mockUnitOfWork.plaidItems.create as jest.Mock).mockRejectedValue(dbError);
+
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '550e8400-e29b-41d4-a716-446655440000',
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow(ConflictError);
+            });
+
+            it('should re-throw non-constraint database errors', async () => {
+                const dbError = new Error('Connection timeout');
+
+                mockPlaidExchangeToken.mockResolvedValue({
+                    access_token: 'access-token-xyz',
+                    item_id: 'item-id-123',
+                });
+                mockPlaidItemGet.mockResolvedValue({
+                    item: { institution_id: 'ins_123' },
+                });
+                mockPlaidGetInstitution.mockResolvedValue({
+                    institution: { name: 'Test Bank' },
+                });
+                mockEncrypt.mockReturnValue('encrypted-token');
+                
+                // Mock the transaction to throw a non-constraint error
+                mockUnitOfWork.executeTransaction.mockImplementation(async (fn) => fn());
+                mockUnitOfWork.plaidItems.create.mockRejectedValue(dbError);
+
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '550e8400-e29b-41d4-a716-446655440000',
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow('Connection timeout');
+            });
+        });
+
+        describe('Plaid API Error Handling', () => {
+            it('should throw ValidationError for INVALID_PUBLIC_TOKEN', async () => {
+                const plaidError = {
+                    error_code: 'INVALID_PUBLIC_TOKEN',
+                    message: 'The public token is invalid'
+                };
+
+                mockPlaidExchangeToken.mockRejectedValue(plaidError);
+
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '550e8400-e29b-41d4-a716-446655440000',
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ApiError for PUBLIC_TOKEN_EXCHANGE_FAILED', async () => {
+                const plaidError = {
+                    error_code: 'PUBLIC_TOKEN_EXCHANGE_FAILED',
+                    message: 'Token exchange failed'
+                };
+
+                mockPlaidExchangeToken.mockRejectedValue(plaidError);
+
+                await expect(
+                    exchangePublicToken(
+                        mockPlaidExchangeToken,
+                        mockPlaidItemGet,
+                        mockPlaidGetInstitution,
+                        mockEncrypt,
+                        mockUnitOfWork,
+                        '550e8400-e29b-41d4-a716-446655440000',
+                        'public-test-token-123456789'
+                    )
+                ).rejects.toThrow('Failed to exchange public token with Plaid');
+            });
         });
     });
 

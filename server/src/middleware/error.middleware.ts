@@ -12,6 +12,108 @@ interface ErrorResponse {
     };
 }
 
+/**
+ * Interface for error classification and response mapping
+ */
+interface ErrorClassification {
+    statusCode: number;
+    errorCode: string;
+    message: string;
+    details?: any;
+}
+
+/**
+ * Logs error with full request context
+ */
+const logErrorWithContext = (error: Error, req: Request): void => {
+    const userId = (req as AuthRequest).user?.id || 'anonymous';
+
+    req.log.error({
+        err: error,
+        userId,
+        path: req.path,
+        method: req.method,
+        body: req.body,
+        query: req.query,
+        params: req.params,
+    }, 'Request failed');
+};
+
+/**
+ * Classifies error and determines appropriate response details
+ */
+const classifyError = (error: Error, req: Request): ErrorClassification => {
+    if (error instanceof ApiError) {
+        // Handle our custom errors
+        const errorName = error.constructor.name;
+        const errorCode = ERROR_CODES[errorName] || 'API_ERROR';
+
+        const classification: ErrorClassification = {
+            statusCode: error.statusCode,
+            errorCode,
+            message: error.message,
+        };
+
+        // Include additional details for validation errors
+        if ('details' in error && error.details) {
+            classification.details = error.details;
+        }
+
+        return classification;
+    }
+
+    if (error.name === 'JsonWebTokenError') {
+        return {
+            statusCode: 401,
+            errorCode: 'INVALID_TOKEN',
+            message: 'Invalid authentication token',
+        };
+    }
+
+    if (error.name === 'TokenExpiredError') {
+        return {
+            statusCode: 401,
+            errorCode: 'TOKEN_EXPIRED',
+            message: 'Authentication token has expired',
+        };
+    }
+
+    // Handle unknown errors - don't leak internal details
+    // Log the full error for debugging
+    req.log.error({
+        err: error,
+        stack: error.stack,
+    }, 'Unhandled error occurred');
+
+    return {
+        statusCode: 500,
+        errorCode: 'INTERNAL_SERVER_ERROR',
+        message: 'An unexpected error occurred',
+    };
+};
+
+/**
+ * Creates a standardized error response
+ */
+const createErrorResponse = (classification: ErrorClassification, requestId: string): ErrorResponse => {
+    const errorResponse: ErrorResponse = {
+        error: {
+            code: classification.errorCode,
+            message: classification.message,
+            requestId,
+        }
+    };
+
+    if (classification.details) {
+        errorResponse.error.details = classification.details;
+    }
+
+    return errorResponse;
+};
+
+/**
+ * Main error handler middleware with delegated responsibilities
+ */
 export const errorHandler = (
     error: Error,
     req: Request,
@@ -23,82 +125,17 @@ export const errorHandler = (
         return next(error);
     }
 
-    // Extract user ID if available (from authenticated requests)
-    const userId = (req as AuthRequest).user?.id || 'anonymous';
-
     // Log the error with full context
-    req.log.error({
-        err: error,
-        userId,
-        path: req.path,
-        method: req.method,
-        body: req.body,
-        query: req.query,
-        params: req.params,
-    }, 'Request failed');
+    logErrorWithContext(error, req);
 
-    // Prepare the error response
-    let errorResponse: ErrorResponse;
-    let statusCode: number;
+    // Classify the error and determine response details
+    const classification = classifyError(error, req);
 
-    if (error instanceof ApiError) {
-        // Handle our custom errors
-        const errorName = error.constructor.name;
-        const errorCode = ERROR_CODES[errorName] || 'API_ERROR';
-
-        statusCode = error.statusCode;
-        errorResponse = {
-            error: {
-                code: errorCode,
-                message: error.message,
-                requestId: req.id as string,
-            }
-        };
-
-        // Include additional details for validation errors
-        if ('details' in error && error.details) {
-            errorResponse.error.details = error.details;
-        }
-    } else if (error.name === 'JsonWebTokenError') {
-        // Handle JWT errors
-        statusCode = 401;
-        errorResponse = {
-            error: {
-                code: 'INVALID_TOKEN',
-                message: 'Invalid authentication token',
-                requestId: req.id as string,
-            }
-        };
-    } else if (error.name === 'TokenExpiredError') {
-        // Handle expired JWT
-        statusCode = 401;
-        errorResponse = {
-            error: {
-                code: 'TOKEN_EXPIRED',
-                message: 'Authentication token has expired',
-                requestId: req.id as string,
-            }
-        };
-    } else {
-        // Handle unknown errors - don't leak internal details
-        statusCode = 500;
-        errorResponse = {
-            error: {
-                code: 'INTERNAL_SERVER_ERROR',
-                message: 'An unexpected error occurred',
-                requestId: req.id as string,
-            }
-        };
-
-        // Log the full error for debugging
-        req.log.error({
-            err: error,
-            stack: error.stack,
-        }, 'Unhandled error occurred');
-    }
+    // Create standardized error response
+    const errorResponse = createErrorResponse(classification, req.id as string);
 
     // Send the error response
-    res.status(statusCode).json(errorResponse);
+    res.status(classification.statusCode).json(errorResponse);
 };
 
 // Async error wrapper for routes that might not properly catch errors

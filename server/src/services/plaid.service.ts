@@ -13,8 +13,10 @@ import {
     CountryCode
 } from 'plaid';
 import { UnitOfWork } from '../repositories/interfaces/unit-of-work.interface';
-import { ApiError } from '../utils/errors';
-import { PlaidItem, PlaidItemRepository } from '../repositories/interfaces';
+import { ApiError, ValidationError, ConflictError, handleDatabaseConstraintError, DATABASE_CONSTRAINTS } from '../utils/errors';
+import { validateUserId, validatePlaidPublicToken } from '../utils/validation';
+import { PlaidItem } from '../repositories/interfaces/plaid-types';
+import { PlaidItemRepository } from '../repositories/interfaces/plaid-item.repository.interface';
 
 // Keep the same type definitions for dependency injection
 export type PlaidLinkTokenCreateFn = (
@@ -71,20 +73,32 @@ export const createLinkToken = async (
 };
 
 /**
- * Exchanges a public token for an access token and creates a new Plaid item.
- *
- * Notice: This service now only knows about the repository interface.
- * It is decoupled from the database driver.
+ * Validates input parameters for exchangePublicToken function
  */
-export const exchangePublicToken = async (
+const validateExchangePublicTokenInput = (userId: string, publicToken: string): void => {
+    validateUserId(userId);
+    validatePlaidPublicToken(publicToken);
+};
+
+/**
+ * Interface for Plaid item data needed for database creation
+ */
+interface PlaidItemData {
+    accessToken: string;
+    itemId: string;
+    institutionId: string;
+    institutionName: string;
+}
+
+/**
+ * Fetches comprehensive Plaid item data from Plaid APIs
+ */
+const fetchPlaidItemData = async (
+    publicToken: string,
     plaidExchangeToken: PlaidExchangeTokenFn,
     plaidItemGet: PlaidItemGetFn,
-    plaidGetInstitution: PlaidGetInstitutionFn,
-    encrypt: EncryptFn,
-    unitOfWork: UnitOfWork, // The new dependency, an abstraction.
-    userId: string,
-    publicToken: string
-): Promise<PlaidItem> => {
+    plaidGetInstitution: PlaidGetInstitutionFn
+): Promise<PlaidItemData> => {
     // 1. Exchange the public token for an access token from Plaid
     const exchangeResponse = await plaidExchangeToken({ public_token: publicToken });
     const accessToken = exchangeResponse.access_token;
@@ -105,29 +119,113 @@ export const exchangePublicToken = async (
     });
     const institutionName = institutionResponse.institution.name;
 
-    // 4. Encrypt the access token before storing it
-    const encryptedAccessToken = encrypt(accessToken);
+    return {
+        accessToken,
+        itemId,
+        institutionId,
+        institutionName,
+    };
+};
 
-    // 5. Use the Unit of Work to perform the database operations atomically.
-    // This ensures that creating the item and queueing the sync job either
-    // both succeed or both fail, preventing data inconsistencies.
+/**
+ * Creates Plaid item and initial sync job atomically
+ */
+const createPlaidItemWithSync = async (
+    userId: string,
+    encryptedAccessToken: string,
+    itemData: PlaidItemData,
+    unitOfWork: UnitOfWork
+): Promise<PlaidItem> => {
     return unitOfWork.executeTransaction(async () => {
-        const newItem = await unitOfWork.plaidItems.create({
+        try {
+            const newItem = await unitOfWork.plaidItems.create({
+                userId,
+                encryptedAccessToken,
+                plaidItemId: itemData.itemId,
+                plaidInstitutionId: itemData.institutionId,
+                institutionName: itemData.institutionName,
+            });
+
+            // Queue a background job for the initial transaction sync
+            await unitOfWork.backgroundJobs.create({
+                jobType: 'INITIAL_SYNC',
+                payload: { itemId: newItem.id, userId: userId },
+            });
+
+            return newItem;
+        } catch (dbError: any) {
+            // Handle idempotency: convert database constraint violations to meaningful errors
+            handleDatabaseConstraintError(dbError, DATABASE_CONSTRAINTS.PLAID_ITEM_UNIQUE, itemData.itemId);
+            // TypeScript doesn't realize handleDatabaseConstraintError never returns, so we need this
+            throw new Error('This line should never be reached');
+        }
+    });
+};
+
+/**
+ * Handles Plaid-specific API errors with appropriate error types
+ */
+const handlePlaidApiError = (error: any): never => {
+    // Re-throw ValidationError, ConflictError, and other ApiErrors as they are
+    if (error instanceof ValidationError || error instanceof ConflictError || error instanceof ApiError) {
+        throw error;
+    }
+
+    // Handle Plaid API errors with more context
+    if (error.error_code === 'INVALID_PUBLIC_TOKEN') {
+        throw new ValidationError('The provided public token is invalid or expired');
+    }
+    
+    if (error.error_code === 'PUBLIC_TOKEN_EXCHANGE_FAILED') {
+        throw new ApiError('Failed to exchange public token with Plaid', 502);
+    }
+
+    // Wrap unexpected errors
+    throw new ApiError(`Token exchange failed: ${error.message}`, 500);
+};
+
+/**
+ * Exchanges a public token for an access token and creates a new Plaid item.
+ *
+ * This function coordinates the entire process but delegates specific responsibilities
+ * to focused helper functions for better maintainability and testability.
+ */
+export const exchangePublicToken = async (
+    plaidExchangeToken: PlaidExchangeTokenFn,
+    plaidItemGet: PlaidItemGetFn,
+    plaidGetInstitution: PlaidGetInstitutionFn,
+    encrypt: EncryptFn,
+    unitOfWork: UnitOfWork,
+    userId: string,
+    publicToken: string
+): Promise<PlaidItem> => {
+    // Input validation
+    validateExchangePublicTokenInput(userId, publicToken);
+
+    try {
+        // Fetch all required Plaid data
+        const itemData = await fetchPlaidItemData(
+            publicToken,
+            plaidExchangeToken,
+            plaidItemGet,
+            plaidGetInstitution
+        );
+
+        // Encrypt the access token before storing
+        const encryptedAccessToken = encrypt(itemData.accessToken);
+
+        // Create the database records atomically
+        return await createPlaidItemWithSync(
             userId,
             encryptedAccessToken,
-            plaidItemId: itemId,
-            plaidInstitutionId: institutionId,
-            institutionName,
-        });
-
-        // 6. Queue a background job for the initial transaction sync.
-        await unitOfWork.backgroundJobs.create({
-            jobType: 'INITIAL_SYNC',
-            payload: { itemId: newItem.id, userId: userId },
-        });
-
-        return newItem;
-    });
+            itemData,
+            unitOfWork
+        );
+    } catch (error: any) {
+        handlePlaidApiError(error);
+        // TypeScript doesn't realize handlePlaidApiError never returns, so we need this
+        throw new Error('This line should never be reached');
+    }
 };
 
 /**

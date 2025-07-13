@@ -20,7 +20,7 @@ const mockedPlaidClient = mocked(plaidClient);
 describe('Plaid Integration Tests: POST /api/v1/plaid/exchange-public-token', () => {
     let app: Express;
     let validToken: string;
-    const testUserId = 'user-id-123';
+    const testUserId = '550e8400-e29b-41d4-a716-446655440000'; // Valid UUID format
 
     beforeAll(() => {
         app = express();
@@ -85,7 +85,7 @@ describe('Plaid Integration Tests: POST /api/v1/plaid/exchange-public-token', ()
         const response = await request(app)
             .post('/api/v1/plaid/exchange-public-token')
             .set('Authorization', `Bearer ${validToken}`)
-            .send({ publicToken: 'test-public-token' });
+            .send({ publicToken: 'public-test-token-123456789' });
 
         // --- ASSERT ---
         expect(response.status).toBe(202);
@@ -96,7 +96,7 @@ describe('Plaid Integration Tests: POST /api/v1/plaid/exchange-public-token', ()
             user_id: testUserId,
         });
         expect(mockedPlaidClient.itemPublicTokenExchange).toHaveBeenCalledWith({
-            public_token: 'test-public-token',
+            public_token: 'public-test-token-123456789',
         });
     });
 
