@@ -2,8 +2,6 @@
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 
-// Environment variables should be passed in through the process, not loaded from .env
-// The application should be started with the necessary environment variables
 
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
