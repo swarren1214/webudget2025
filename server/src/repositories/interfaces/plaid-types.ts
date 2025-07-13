@@ -21,4 +21,5 @@ export interface PlaidItem {
     last_successful_sync: string | null;
     created_at: string;
     updated_at: string;
+    archived_at: string | null;
 }
