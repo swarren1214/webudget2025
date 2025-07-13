@@ -2,19 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/api';
 import { supabase } from '@/lib/supabaseClient';
+import { debugLog, errorLog } from '@/lib/utils';
+import { PlaidErrorBoundary, usePlaidErrorHandler } from '@/components/PlaidErrorBoundary';
 
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [linkToken, setLinkToken] = useState<string | null>(null);
+  
+  // Error handling for Plaid operations
+  const { handlePlaidError } = usePlaidErrorHandler();
 
   // 🐛 DEBUG: Session state on component mount
   useEffect(() => {
-    console.log('🔍 [Onboarding] Component mounted - checking session state...');
+    debugLog('[Onboarding] Component mounted - checking session state...');
     const checkSession = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
-      console.log('🔍 [Onboarding] Session on mount:', {
+      debugLog('[Onboarding] Session on mount:', {
         hasSession: !!sessionData.session,
         userId: sessionData.session?.user?.id,
         hasAccessToken: !!sessionData.session?.access_token,
@@ -29,12 +34,12 @@ const OnboardingPage: React.FC = () => {
   // Get link token when step 2 is reached
   useEffect(() => {
     if (step === 2 && !linkToken) {
-      console.log('🔍 [Onboarding] Step 2 reached - BEFORE createPlaidLinkToken API call...');
+      debugLog('[Onboarding] Step 2 reached - BEFORE createPlaidLinkToken API call...');
       
       // Check session again right before API call
       const checkSessionBeforeAPI = async () => {
         const { data: sessionData } = await supabase.auth.getSession();
-        console.log('🔍 [Onboarding] Session RIGHT BEFORE API call:', {
+        debugLog('[Onboarding] Session RIGHT BEFORE API call:', {
           hasSession: !!sessionData.session,
           userId: sessionData.session?.user?.id,
           hasAccessToken: !!sessionData.session?.access_token,
@@ -44,12 +49,13 @@ const OnboardingPage: React.FC = () => {
 
         // Now make the API call
         try {
-          console.log('🔍 [Onboarding] CALLING createPlaidLinkToken now...');
+          debugLog('[Onboarding] CALLING createPlaidLinkToken now...');
           const data = await createPlaidLinkToken();
-          console.log('🔍 [Onboarding] createPlaidLinkToken SUCCESS:', data);
+          debugLog('[Onboarding] createPlaidLinkToken SUCCESS:', data);
           setLinkToken(data.linkToken);
         } catch (error) {
-          console.error('🔍 [Onboarding] createPlaidLinkToken FAILED:', error);
+          errorLog('[Onboarding] createPlaidLinkToken FAILED:', error);
+          handlePlaidError(error);
         }
       };
 
@@ -73,7 +79,7 @@ const OnboardingPage: React.FC = () => {
 
   // Monitor Plaid Link readiness for debugging (remove in production)
   useEffect(() => {
-    console.log('🔍 [Onboarding] Plaid Link state:', {
+    debugLog('[Onboarding] Plaid Link state:', {
       hasToken: !!linkToken,
       ready,
       isPlaidReady,
@@ -110,26 +116,34 @@ const OnboardingPage: React.FC = () => {
         );
       case 2:
         return (
-          <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">Connect Bank Account</h2>
-            <button
-              onClick={() => {
-                console.log('🔍 [Onboarding] Connect button clicked:', { isPlaidReady });
-                if (isPlaidReady) {
-                  open();
-                }
-              }}
-              disabled={!isPlaidReady}
-              className="py-2 px-4 bg-big-grinch text-white rounded-lg font-semibold hover:bg-green-700 transition"
-              style={{ 
-                opacity: !isPlaidReady ? 0.5 : 1,
-                cursor: !isPlaidReady ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {plaidLinked ? 'Account Linked!' : 'Connect with Plaid'}
-              {!isPlaidReady && <span className="ml-2 text-xs">(Loading...)</span>}
-            </button>
-          </div>
+          <PlaidErrorBoundary
+            onError={(error, errorInfo) => {
+              // Additional error reporting could go here
+              // e.g., send to analytics, error tracking service
+              debugLog('[Onboarding] Plaid error boundary triggered:', { error: error.message });
+            }}
+          >
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-4">Connect Bank Account</h2>
+              <button
+                onClick={() => {
+                  debugLog('[Onboarding] Connect button clicked:', { isPlaidReady });
+                  if (isPlaidReady) {
+                    open();
+                  }
+                }}
+                disabled={!isPlaidReady}
+                className="py-2 px-4 bg-big-grinch text-white rounded-lg font-semibold hover:bg-green-700 transition"
+                style={{ 
+                  opacity: !isPlaidReady ? 0.5 : 1,
+                  cursor: !isPlaidReady ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {plaidLinked ? 'Account Linked!' : 'Connect with Plaid'}
+                {!isPlaidReady && <span className="ml-2 text-xs">(Loading...)</span>}
+              </button>
+            </div>
+          </PlaidErrorBoundary>
         );
       case 3:
         return (
