@@ -21,7 +21,11 @@
   "editor.formatOnSave": true,
   "[markdown]": {
     "editor.wordWrap": "on",
-    "editor.quickSuggestions": false
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    }
   },
   // ---------- ESLint ----------
   "eslint.enable": true,
@@ -45,5 +49,7 @@
   ],
   // ---------- Docker ----------
   "docker.composeCommand": "docker compose",
-  "docker.enableDockerComposeLanguageService": true
+  "docker.enableDockerComposeLanguageService": true,
+  "containers.composeCommand": "docker compose",
+  "containers.enableComposeLanguageService": true
 }
