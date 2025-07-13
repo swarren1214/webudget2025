@@ -38,6 +38,25 @@ export type PlaidItemGetFn = (
 export type EncryptFn = (text: string) => string;
 
 /**
+ * Context object containing all infrastructure dependencies for token exchange
+ */
+export interface PlaidTokenExchangeContext {
+    plaidExchangeToken: PlaidExchangeTokenFn;
+    plaidItemGet: PlaidItemGetFn;
+    plaidGetInstitution: PlaidGetInstitutionFn;
+    encrypt: EncryptFn;
+    unitOfWork: UnitOfWork;
+}
+
+/**
+ * Request object containing business data for token exchange
+ */
+export interface ExchangeTokenRequest {
+    userId: string;
+    publicToken: string;
+}
+
+/**
  * Creates a Plaid link token for a given user.
  * This function has no infrastructure dependencies.
  */
@@ -186,11 +205,49 @@ const handlePlaidApiError = (error: any): never => {
 
 /**
  * Exchanges a public token for an access token and creates a new Plaid item.
- *
- * This function coordinates the entire process but delegates specific responsibilities
- * to focused helper functions for better maintainability and testability.
+ * 
+ * @param context - Infrastructure dependencies for token exchange
+ * @param request - Business data for the token exchange
+ * @returns Promise resolving to the created PlaidItem
  */
 export const exchangePublicToken = async (
+    context: PlaidTokenExchangeContext,
+    request: ExchangeTokenRequest
+): Promise<PlaidItem> => {
+    // Input validation
+    validateExchangePublicTokenInput(request.userId, request.publicToken);
+
+    try {
+        // Fetch all required Plaid data
+        const itemData = await fetchPlaidItemData(
+            request.publicToken,
+            context.plaidExchangeToken,
+            context.plaidItemGet,
+            context.plaidGetInstitution
+        );
+
+        // Encrypt the access token before storing
+        const encryptedAccessToken = context.encrypt(itemData.accessToken);
+
+        // Create the database records atomically
+        return await createPlaidItemWithSync(
+            request.userId,
+            encryptedAccessToken,
+            itemData,
+            context.unitOfWork
+        );
+    } catch (error: any) {
+        handlePlaidApiError(error);
+        // TypeScript doesn't realize handlePlaidApiError never returns, so we need this
+        throw new Error('This line should never be reached');
+    }
+};
+
+/**
+ * Legacy function signature for backward compatibility
+ * @deprecated Use the version with PlaidTokenExchangeContext instead
+ */
+export const exchangePublicTokenLegacy = async (
     plaidExchangeToken: PlaidExchangeTokenFn,
     plaidItemGet: PlaidItemGetFn,
     plaidGetInstitution: PlaidGetInstitutionFn,
@@ -199,33 +256,18 @@ export const exchangePublicToken = async (
     userId: string,
     publicToken: string
 ): Promise<PlaidItem> => {
-    // Input validation
-    validateExchangePublicTokenInput(userId, publicToken);
-
-    try {
-        // Fetch all required Plaid data
-        const itemData = await fetchPlaidItemData(
-            publicToken,
-            plaidExchangeToken,
-            plaidItemGet,
-            plaidGetInstitution
-        );
-
-        // Encrypt the access token before storing
-        const encryptedAccessToken = encrypt(itemData.accessToken);
-
-        // Create the database records atomically
-        return await createPlaidItemWithSync(
-            userId,
-            encryptedAccessToken,
-            itemData,
-            unitOfWork
-        );
-    } catch (error: any) {
-        handlePlaidApiError(error);
-        // TypeScript doesn't realize handlePlaidApiError never returns, so we need this
-        throw new Error('This line should never be reached');
-    }
+    const context: PlaidTokenExchangeContext = {
+        plaidExchangeToken,
+        plaidItemGet,
+        plaidGetInstitution,
+        encrypt,
+        unitOfWork,
+    };
+    const request: ExchangeTokenRequest = {
+        userId,
+        publicToken,
+    };
+    return exchangePublicToken(context, request);
 };
 
 /**

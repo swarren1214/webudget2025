@@ -5,6 +5,9 @@ import {
     createLinkToken,
     PlaidLinkTokenCreateFn,
     exchangePublicToken,
+    exchangePublicTokenLegacy,
+    PlaidTokenExchangeContext,
+    ExchangeTokenRequest,
     EncryptFn,
     PlaidExchangeTokenFn,
     PlaidGetInstitutionFn,
@@ -106,6 +109,27 @@ describe('Plaid Service', () => {
 
         beforeEach(() => jest.clearAllMocks());
 
+        // Helper function to create context and request objects for the new signature
+        const createExchangeTokenParams = (userId: string, publicToken: string) => {
+            const context: PlaidTokenExchangeContext = {
+                plaidExchangeToken: mockPlaidExchangeToken,
+                plaidItemGet: mockPlaidItemGet,
+                plaidGetInstitution: mockPlaidGetInstitution,
+                encrypt: mockEncrypt,
+                unitOfWork: mockUnitOfWork,
+            };
+            
+            const request: ExchangeTokenRequest = {
+                userId,
+                publicToken,
+            };
+            
+            return { context, request };
+        };
+
+        // Temporarily use legacy function calls for other tests
+        const testExchangeFunction = exchangePublicTokenLegacy;
+
         it('should correctly orchestrate token exchange and atomic item creation', async () => {
             // Arrange: Set up the return value for the repository call.
             const mockNewPlaidItem: PlaidItem = {
@@ -125,7 +149,8 @@ describe('Plaid Service', () => {
 
             // --- ACT ---
             // Call the service with all its dependencies injected, including our mock UoW.
-            const result = await exchangePublicToken(
+            const { context, request } = createExchangeTokenParams('user-123', 'public-token-abc');
+            const result = await testExchangeFunction(
                 mockPlaidExchangeToken,
                 mockPlaidItemGet,
                 mockPlaidGetInstitution,
@@ -165,16 +190,9 @@ describe('Plaid Service', () => {
 
             // --- ACT & ASSERT ---
             // Expect the service to throw the same error it received from its dependency.
+            const { context, request } = createExchangeTokenParams('user-123', 'public-token');
             await expect(
-                exchangePublicToken(
-                    mockPlaidExchangeToken,
-                    mockPlaidItemGet,
-                    mockPlaidGetInstitution,
-                    mockEncrypt,
-                    mockUnitOfWork,
-                    'user-123',
-                    'public-token'
-                )
+                testExchangeFunction(context, request)
             ).rejects.toThrow(plaidError);
 
             // Assert that no transaction was even attempted.
@@ -184,7 +202,7 @@ describe('Plaid Service', () => {
         describe('Input Validation', () => {
             it('should throw ValidationError for empty userId', async () => {
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -198,7 +216,7 @@ describe('Plaid Service', () => {
 
             it('should throw ValidationError for null userId', async () => {
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -212,7 +230,7 @@ describe('Plaid Service', () => {
 
             it('should throw ValidationError for non-string userId', async () => {
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -226,7 +244,7 @@ describe('Plaid Service', () => {
 
             it('should throw ValidationError for invalid userId format', async () => {
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -268,7 +286,7 @@ describe('Plaid Service', () => {
                  (mockUnitOfWork.backgroundJobs.create as jest.Mock).mockResolvedValue(undefined);
 
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -310,7 +328,7 @@ describe('Plaid Service', () => {
                  (mockUnitOfWork.backgroundJobs.create as jest.Mock).mockResolvedValue(undefined);
 
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -324,7 +342,7 @@ describe('Plaid Service', () => {
 
             it('should throw ValidationError for empty publicToken', async () => {
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -338,7 +356,7 @@ describe('Plaid Service', () => {
 
             it('should throw ValidationError for invalid publicToken format', async () => {
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -352,7 +370,7 @@ describe('Plaid Service', () => {
 
             it('should throw ValidationError for short publicToken', async () => {
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -390,7 +408,7 @@ describe('Plaid Service', () => {
                  (mockUnitOfWork.plaidItems.create as jest.Mock).mockRejectedValue(dbError);
 
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -422,7 +440,7 @@ describe('Plaid Service', () => {
                 mockUnitOfWork.plaidItems.create.mockRejectedValue(dbError);
 
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -445,7 +463,7 @@ describe('Plaid Service', () => {
                 mockPlaidExchangeToken.mockRejectedValue(plaidError);
 
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
@@ -466,7 +484,7 @@ describe('Plaid Service', () => {
                 mockPlaidExchangeToken.mockRejectedValue(plaidError);
 
                 await expect(
-                    exchangePublicToken(
+                    testExchangeFunction(
                         mockPlaidExchangeToken,
                         mockPlaidItemGet,
                         mockPlaidGetInstitution,
