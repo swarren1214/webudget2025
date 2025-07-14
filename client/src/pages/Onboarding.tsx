@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/api';
 import { supabase } from '@/lib/supabaseClient';
-import { debugLog, errorLog } from '@/lib/utils';
+import { errorLog } from '@/lib/utils';
 import { PlaidErrorBoundary, usePlaidErrorHandler } from '@/components/PlaidErrorBoundary';
 
 const OnboardingPage: React.FC = () => {
@@ -14,19 +14,11 @@ const OnboardingPage: React.FC = () => {
   // Error handling for Plaid operations
   const { handlePlaidError } = usePlaidErrorHandler();
 
-  // 🐛 DEBUG: Session state on component mount
+  // Verify session state on component mount
   useEffect(() => {
-    debugLog('[Onboarding] Component mounted - checking session state...');
     const checkSession = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
-      debugLog('[Onboarding] Session on mount:', {
-        hasSession: !!sessionData.session,
-        userId: sessionData.session?.user?.id,
-        hasAccessToken: !!sessionData.session?.access_token,
-        accessTokenLength: sessionData.session?.access_token?.length,
-        userEmail: sessionData.session?.user?.email,
-        timestamp: new Date().toISOString()
-      });
+      // Session validation completed
     };
     checkSession();
   }, []);
@@ -34,24 +26,12 @@ const OnboardingPage: React.FC = () => {
   // Get link token when step 2 is reached
   useEffect(() => {
     if (step === 2 && !linkToken) {
-      debugLog('[Onboarding] Step 2 reached - BEFORE createPlaidLinkToken API call...');
-      
-      // Check session again right before API call
       const checkSessionBeforeAPI = async () => {
         const { data: sessionData } = await supabase.auth.getSession();
-        debugLog('[Onboarding] Session RIGHT BEFORE API call:', {
-          hasSession: !!sessionData.session,
-          userId: sessionData.session?.user?.id,
-          hasAccessToken: !!sessionData.session?.access_token,
-          accessTokenLength: sessionData.session?.access_token?.length,
-          timestamp: new Date().toISOString()
-        });
-
-        // Now make the API call
+        
+        // Create Plaid link token
         try {
-          debugLog('[Onboarding] CALLING createPlaidLinkToken now...');
           const data = await createPlaidLinkToken();
-          debugLog('[Onboarding] createPlaidLinkToken SUCCESS:', data);
           setLinkToken(data.linkToken);
         } catch (error) {
           errorLog('[Onboarding] createPlaidLinkToken FAILED:', error);
@@ -77,14 +57,9 @@ const OnboardingPage: React.FC = () => {
   // ✅ IMMUTABLE STATE: Only consider ready when BOTH conditions are met
   const isPlaidReady = Boolean(linkToken) && ready;
 
-  // Monitor Plaid Link readiness for debugging (remove in production)
+  // Plaid Link readiness monitoring
   useEffect(() => {
-    debugLog('[Onboarding] Plaid Link state:', {
-      hasToken: !!linkToken,
-      ready,
-      isPlaidReady,
-      step
-    });
+    // Monitor link readiness state changes
   }, [linkToken, ready, isPlaidReady, step]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,14 +95,13 @@ const OnboardingPage: React.FC = () => {
             onError={(error, errorInfo) => {
               // Additional error reporting could go here
               // e.g., send to analytics, error tracking service
-              debugLog('[Onboarding] Plaid error boundary triggered:', { error: error.message });
+              errorLog('[Onboarding] Plaid error boundary triggered:', { error: error.message });
             }}
           >
             <div className="text-center">
               <h2 className="text-xl font-semibold mb-4">Connect Bank Account</h2>
               <button
                 onClick={() => {
-                  debugLog('[Onboarding] Connect button clicked:', { isPlaidReady });
                   if (isPlaidReady) {
                     open();
                   }
