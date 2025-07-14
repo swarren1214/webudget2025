@@ -1,6 +1,7 @@
 // server/src/config/env.ts
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
+import { ConfigurationError } from '../utils/errors';
 
 
 const envSchema = z.object({
@@ -25,10 +26,14 @@ try {
     // 2. If validation fails, format the error for readability
     const validationError = fromZodError(error as z.ZodError);
 
-    // 3. Log the friendly error message and exit
-    console.error('FATAL_ERROR: Invalid environment variables found.');
-    console.error(validationError.toString());
-    process.exit(1);
+    // 3. Throw a ConfigurationError with detailed information
+    throw new ConfigurationError(
+        'Invalid environment variables found',
+        {
+            message: validationError.toString(),
+            errors: validationError.details
+        }
+    );
 }
 
 // 4. Export the validated and typed configuration object

@@ -66,6 +66,18 @@ export class TooManyRequestsError extends ApiError {
 }
 
 /**
+ * Configuration error for invalid environment variables or system configuration
+ * This error is thrown during application startup when required configuration is missing or invalid
+ */
+export class ConfigurationError extends Error {
+    constructor(message: string, public readonly details?: any) {
+        super(message);
+        this.name = 'ConfigurationError';
+        Object.setPrototypeOf(this, ConfigurationError.prototype);
+    }
+}
+
+/**
  * Database constraint error configuration for reusable error handling
  */
 export interface DatabaseConstraintConfig {
@@ -114,4 +126,5 @@ export const ERROR_CODES: Record<string, string> = {
     ForbiddenError: 'FORBIDDEN',
     ConflictError: 'CONFLICT',
     TooManyRequestsError: 'TOO_MANY_REQUESTS',
+    ConfigurationError: 'CONFIGURATION_ERROR',
 };

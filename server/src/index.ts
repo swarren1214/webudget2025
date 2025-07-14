@@ -8,6 +8,21 @@ import pinoHttp from 'pino-http';
 import { randomUUID } from 'crypto';
 import mainRouter from './api/routes';
 import { errorHandler } from './middleware/error.middleware';
+import { ConfigurationError } from './utils/errors';
+
+// Handle configuration errors gracefully
+process.on('uncaughtException', (error) => {
+    if (error instanceof ConfigurationError) {
+        console.error('FATAL_ERROR: Configuration validation failed');
+        console.error(error.message);
+        if (error.details?.message) {
+            console.error(error.details.message);
+        }
+        process.exit(1);
+    }
+    // Re-throw other uncaught exceptions
+    throw error;
+});
 
 // Initialize the Express application
 const app: Express = express();
