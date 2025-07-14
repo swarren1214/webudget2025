@@ -244,33 +244,6 @@ export const exchangePublicToken = async (
 };
 
 /**
- * Legacy function signature for backward compatibility
- * @deprecated Use the version with PlaidTokenExchangeContext instead
- */
-export const exchangePublicTokenLegacy = async (
-    plaidExchangeToken: PlaidExchangeTokenFn,
-    plaidItemGet: PlaidItemGetFn,
-    plaidGetInstitution: PlaidGetInstitutionFn,
-    encrypt: EncryptFn,
-    unitOfWork: UnitOfWork,
-    userId: string,
-    publicToken: string
-): Promise<PlaidItem> => {
-    const context: PlaidTokenExchangeContext = {
-        plaidExchangeToken,
-        plaidItemGet,
-        plaidGetInstitution,
-        encrypt,
-        unitOfWork,
-    };
-    const request: ExchangeTokenRequest = {
-        userId,
-        publicToken,
-    };
-    return exchangePublicToken(context, request);
-};
-
-/**
  * Checks if a user can link another bank account
  */
 export const canLinkAnotherAccount = async (

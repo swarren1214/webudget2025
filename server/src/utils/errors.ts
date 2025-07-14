@@ -97,7 +97,7 @@ export const handleDatabaseConstraintError = (
     error: any,
     constraintConfig: DatabaseConstraintConfig,
     identifier?: string
-): void => {
+): never => {
     if (error.code === constraintConfig.errorCode && error.constraint === constraintConfig.constraintName) {
         throw new ConflictError(constraintConfig.createMessage(identifier));
     }
