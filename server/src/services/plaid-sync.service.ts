@@ -1,7 +1,7 @@
 // server/src/services/plaid-sync.service.ts
 
 import { UnitOfWork } from '../repositories/interfaces/unit-of-work.interface';
-import { ItemStatus } from '../repositories/plaid.repository';
+import { ItemStatus } from '../repositories/interfaces/';
 import logger from '../logger';
 
 export interface SyncResult {

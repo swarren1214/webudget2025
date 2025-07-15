@@ -5,6 +5,8 @@ import {
     createLinkToken,
     PlaidLinkTokenCreateFn,
     exchangePublicToken,
+    PlaidTokenExchangeContext,
+    ExchangeTokenRequest,
     EncryptFn,
     PlaidExchangeTokenFn,
     PlaidGetInstitutionFn,
@@ -12,9 +14,8 @@ import {
     canLinkAnotherAccount,
     archiveInstitution
 } from './plaid.service';
-import { PlaidItemRepository } from '../repositories/interfaces/plaid-item.repository.interface';
-import { PlaidItem, ItemStatus } from '../repositories/plaid.repository';
-import { ApiError } from '../utils/errors';
+import { PlaidItemRepository, UnitOfWork, PlaidItem, ItemStatus } from '../repositories/interfaces';
+import { ApiError, ValidationError, ConflictError } from '../utils/errors';
 
 describe('Plaid Service', () => {
     // Mock dependencies
@@ -44,7 +45,6 @@ describe('Plaid Service', () => {
                 linkToken: mockPlaidSuccessResponse.link_token,
                 expiration: mockPlaidSuccessResponse.expiration,
             });
-
             expect(mockPlaidClientSuccess).toHaveBeenCalledTimes(1);
             expect(mockPlaidClientSuccess).toHaveBeenCalledWith({
                 user: { client_user_id: userId },
@@ -67,101 +67,335 @@ describe('Plaid Service', () => {
     });
 
     describe('exchangePublicToken', () => {
-        const mockPlaidExchangeResponse = {
-            access_token: 'real-access-token',
-            item_id: 'plaid-item-id-xyz'
-        };
-        const mockItemGetResponse = {
-            item: {
-                institution_id: 'ins_1'
-            }
-        };
-        const mockPlaidInstitutionResponse = {
-            institution: {
-                name: 'Test Bank'
-            }
-        };
-
+        // --- ARRANGE ---
+        // 1. Define mock responses from Plaid and a mock encrypted token.
+        const mockPlaidExchangeResponse = { access_token: 'real-access-token', item_id: 'plaid-item-id-xyz' };
+        const mockItemGetResponse = { item: { institution_id: 'ins_1' } };
+        const mockPlaidInstitutionResponse = { institution: { name: 'Test Bank' } };
         const mockEncryptedToken = 'encrypted-token-string';
-        const mockNewPlaidItem: PlaidItem = {
-            id: 1,
-            user_id: 'user-123',
-            plaid_item_id: 'plaid-item-id-xyz',
-            plaid_access_token: 'encrypted-token-string',
-            plaid_institution_id: 'ins_1',
-            institution_name: 'Test Bank',
-            sync_status: 'good' as ItemStatus,
-            last_successful_sync: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
 
-        const mockPlaidExchange: PlaidExchangeTokenFn = jest.fn().mockResolvedValue(mockPlaidExchangeResponse);
+        // 2. Define mock implementations of the service's function-based dependencies.
+        const mockPlaidExchangeToken: PlaidExchangeTokenFn = jest.fn().mockResolvedValue(mockPlaidExchangeResponse);
         const mockPlaidItemGet: PlaidItemGetFn = jest.fn().mockResolvedValue(mockItemGetResponse);
         const mockPlaidGetInstitution: PlaidGetInstitutionFn = jest.fn().mockResolvedValue(mockPlaidInstitutionResponse);
         const mockEncrypt: EncryptFn = jest.fn().mockReturnValue(mockEncryptedToken);
 
-        // Create a mock repository - much simpler than before!
-        const mockPlaidItemRepository: jest.Mocked<PlaidItemRepository> = {
-            create: jest.fn().mockResolvedValue(mockNewPlaidItem),
-            findById: jest.fn(),
-            findByUserId: jest.fn(),
-            findByPlaidItemId: jest.fn(),
-            update: jest.fn(),
-            archive: jest.fn(),
-            hasReachedItemLimit: jest.fn(),
+        // 3. Create a mock UnitOfWork object that conforms to the interface.
+        // This allows us to test the service's interaction with its repositories.
+        const mockUnitOfWork: jest.Mocked<UnitOfWork> = {
+            plaidItems: {
+                create: jest.fn(),
+                findById: jest.fn(),
+                findByUserId: jest.fn(),
+                findByPlaidItemId: jest.fn(),
+                findByIdAndUserId: jest.fn(),
+                update: jest.fn(),
+                archive: jest.fn(),
+                hasReachedItemLimit: jest.fn(),
+            },
+            backgroundJobs: {
+                create: jest.fn(),
+                findNextAvailable: jest.fn(),
+                markAsRunning: jest.fn(),
+                markAsCompleted: jest.fn(),
+                markAsFailed: jest.fn(),
+            },
+            // Mock executeTransaction to simply run the operation passed to it.
+            // This lets us test the logic that happens *inside* the transaction.
+            executeTransaction: jest.fn().mockImplementation(operation => operation()),
+            commit: jest.fn(),
+            rollback: jest.fn(),
         };
 
         beforeEach(() => jest.clearAllMocks());
 
-        it('should correctly orchestrate token exchange and item creation', async () => {
-            const userId = 'user-123';
-            const publicToken = 'public-token-abc';
-
-            const result = await exchangePublicToken(
-                mockPlaidExchange,
-                mockPlaidItemGet,
-                mockPlaidGetInstitution,
-                mockEncrypt,
-                mockPlaidItemRepository,
+        // Helper function to create context and request objects for the new signature
+        const createExchangeTokenParams = (userId: string, publicToken: string) => {
+            const context: PlaidTokenExchangeContext = {
+                plaidExchangeToken: mockPlaidExchangeToken,
+                plaidItemGet: mockPlaidItemGet,
+                plaidGetInstitution: mockPlaidGetInstitution,
+                encrypt: mockEncrypt,
+                unitOfWork: mockUnitOfWork,
+            };
+            
+            const request: ExchangeTokenRequest = {
                 userId,
-                publicToken
-            );
+                publicToken,
+            };
+            
+            return { context, request };
+        };
 
+        // Use the new function signature for tests
+        const testExchangeFunction = exchangePublicToken;
+
+        it('should correctly orchestrate token exchange and atomic item creation', async () => {
+            // Arrange: Set up the return value for the repository call.
+            const mockNewPlaidItem: PlaidItem = {
+                id: 1,
+                user_id: 'user-123',
+                plaid_item_id: 'plaid-item-id-xyz',
+                plaid_access_token: 'encrypted-token-string',
+                plaid_institution_id: 'ins_1',
+                institution_name: 'Test Bank',
+                sync_status: 'good' as ItemStatus,
+                last_successful_sync: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                archived_at: null,
+            };
+            (mockUnitOfWork.plaidItems.create as jest.Mock).mockResolvedValue(mockNewPlaidItem);
+
+            // --- ACT ---
+            // Call the service with all its dependencies injected, including our mock UoW.
+            const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'public-test-token-123456789');
+            const result = await testExchangeFunction(context, request);
+
+            // --- ASSERT ---
+            // 1. Assert that the final result is the new item created by the repository.
             expect(result).toEqual(mockNewPlaidItem);
-            expect(mockPlaidExchange).toHaveBeenCalledWith({ public_token: publicToken });
-            expect(mockPlaidItemGet).toHaveBeenCalledWith({ access_token: 'real-access-token' });
-            expect(mockPlaidGetInstitution).toHaveBeenCalledWith({
-                institution_id: 'ins_1',
-                country_codes: [CountryCode.Us]
-            });
-            expect(mockEncrypt).toHaveBeenCalledWith('real-access-token');
-            expect(mockPlaidItemRepository.create).toHaveBeenCalledWith({
-                userId: userId,
+
+            // 2. Assert that the transaction mechanism was used.
+            expect(mockUnitOfWork.executeTransaction).toHaveBeenCalledTimes(1);
+
+            // 3. Assert that the PlaidItem was created with the correct, encrypted data.
+            expect(mockUnitOfWork.plaidItems.create).toHaveBeenCalledWith({
+                userId: '550e8400-e29b-41d4-a716-446655440000',
                 encryptedAccessToken: mockEncryptedToken,
                 plaidItemId: 'plaid-item-id-xyz',
                 plaidInstitutionId: 'ins_1',
                 institutionName: 'Test Bank',
             });
+
+            // 4. Assert that the background sync job was created within the same transaction.
+            expect(mockUnitOfWork.backgroundJobs.create).toHaveBeenCalledWith({
+                jobType: 'INITIAL_SYNC',
+                payload: { itemId: mockNewPlaidItem.id, userId: '550e8400-e29b-41d4-a716-446655440000' },
+            });
         });
 
-        it('should handle Plaid exchange failures without calling repository', async () => {
-            const error = new Error('Plaid exchange failed');
-            (mockPlaidExchange as jest.Mock).mockRejectedValueOnce(error);
+        it('should throw an error without calling repositories if Plaid exchange fails', async () => {
+            // Arrange: Mock a failure from the Plaid client.
+            const plaidError = new Error('Plaid exchange failed');
+            (mockPlaidExchangeToken as jest.Mock).mockRejectedValueOnce(plaidError);
 
+            // --- ACT & ASSERT ---
+            // Expect the service to throw the same error it received from its dependency.
+            const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'public-test-token-123456789');
             await expect(
-                exchangePublicToken(
-                    mockPlaidExchange,
-                    mockPlaidItemGet,
-                    mockPlaidGetInstitution,
-                    mockEncrypt,
-                    mockPlaidItemRepository,
-                    'user-123',
-                    'public-token'
-                )
-            ).rejects.toThrow(error);
+                testExchangeFunction(context, request)
+            ).rejects.toThrow('Token exchange failed: Plaid exchange failed');
 
-            expect(mockPlaidItemRepository.create).not.toHaveBeenCalled();
+            // Assert that no transaction was even attempted.
+            expect(mockUnitOfWork.executeTransaction).not.toHaveBeenCalled();
+        });
+
+        describe('Input Validation', () => {
+            it('should throw ValidationError for empty userId', async () => {
+                const { context, request } = createExchangeTokenParams('', 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for null userId', async () => {
+                const { context, request } = createExchangeTokenParams(null as any, 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for non-string userId', async () => {
+                const { context, request } = createExchangeTokenParams(123 as any, 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for invalid userId format', async () => {
+                const { context, request } = createExchangeTokenParams('invalid-user-id', 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+
+                         it('should accept valid UUID userId format', async () => {
+                 const validUuid = '550e8400-e29b-41d4-a716-446655440000';
+                 
+                 // Setup successful flow
+                 (mockPlaidExchangeToken as jest.Mock).mockResolvedValue({
+                     access_token: 'access-token-xyz',
+                     item_id: 'item-id-123',
+                 });
+                 (mockPlaidItemGet as jest.Mock).mockResolvedValue({
+                     item: { institution_id: 'ins_123' },
+                 });
+                 (mockPlaidGetInstitution as jest.Mock).mockResolvedValue({
+                     institution: { name: 'Test Bank' },
+                 });
+                 (mockEncrypt as jest.Mock).mockReturnValue('encrypted-token');
+                 (mockUnitOfWork.executeTransaction as jest.Mock).mockImplementation(async (fn) => fn());
+                 (mockUnitOfWork.plaidItems.create as jest.Mock).mockResolvedValue({
+                     id: 1,
+                     userId: validUuid,
+                     plaidItemId: 'item-id-123',
+                     plaidInstitutionId: 'ins_123',
+                     institutionName: 'Test Bank',
+                     encryptedAccessToken: 'encrypted-token',
+                     syncStatus: 'good',
+                     createdAt: new Date(),
+                     updatedAt: new Date(),
+                 });
+                 (mockUnitOfWork.backgroundJobs.create as jest.Mock).mockResolvedValue(undefined);
+
+                const { context, request } = createExchangeTokenParams(validUuid, 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).resolves.toBeDefined();
+            });
+
+                         it('should accept valid Auth0 ID userId format', async () => {
+                 const validAuth0Id = 'auth0|507f1f77bcf86cd799439011';
+                 
+                 // Setup successful flow
+                 (mockPlaidExchangeToken as jest.Mock).mockResolvedValue({
+                     access_token: 'access-token-xyz',
+                     item_id: 'item-id-123',
+                 });
+                 (mockPlaidItemGet as jest.Mock).mockResolvedValue({
+                     item: { institution_id: 'ins_123' },
+                 });
+                 (mockPlaidGetInstitution as jest.Mock).mockResolvedValue({
+                     institution: { name: 'Test Bank' },
+                 });
+                 (mockEncrypt as jest.Mock).mockReturnValue('encrypted-token');
+                 (mockUnitOfWork.executeTransaction as jest.Mock).mockImplementation(async (fn) => fn());
+                 (mockUnitOfWork.plaidItems.create as jest.Mock).mockResolvedValue({
+                     id: 1,
+                     userId: validAuth0Id,
+                     plaidItemId: 'item-id-123',
+                     plaidInstitutionId: 'ins_123',
+                     institutionName: 'Test Bank',
+                     encryptedAccessToken: 'encrypted-token',
+                     syncStatus: 'good',
+                     createdAt: new Date(),
+                     updatedAt: new Date(),
+                 });
+                 (mockUnitOfWork.backgroundJobs.create as jest.Mock).mockResolvedValue(undefined);
+
+                const { context, request } = createExchangeTokenParams(validAuth0Id, 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).resolves.toBeDefined();
+            });
+
+            it('should throw ValidationError for empty publicToken', async () => {
+                const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', '');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for invalid publicToken format', async () => {
+                const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'invalid-token');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ValidationError for short publicToken', async () => {
+                const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'public-short');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+        });
+
+                 describe('Idempotency Protection', () => {
+             it('should throw ConflictError when plaid_item_id already exists', async () => {
+                 const dbError = {
+                     code: '23505',
+                     constraint: 'plaid_items_plaid_item_id_key',
+                     message: 'duplicate key value violates unique constraint'
+                 };
+
+                 (mockPlaidExchangeToken as jest.Mock).mockResolvedValue({
+                     access_token: 'access-token-xyz',
+                     item_id: 'duplicate-item-id-123',
+                 });
+                 (mockPlaidItemGet as jest.Mock).mockResolvedValue({
+                     item: { institution_id: 'ins_123' },
+                 });
+                 (mockPlaidGetInstitution as jest.Mock).mockResolvedValue({
+                     institution: { name: 'Test Bank' },
+                 });
+                 (mockEncrypt as jest.Mock).mockReturnValue('encrypted-token');
+                 
+                 // Mock the transaction to throw a database constraint error
+                 (mockUnitOfWork.executeTransaction as jest.Mock).mockImplementation(async (fn) => fn());
+                 (mockUnitOfWork.plaidItems.create as jest.Mock).mockRejectedValue(dbError);
+
+                const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ConflictError);
+            });
+
+            it('should re-throw non-constraint database errors', async () => {
+                const dbError = new Error('Connection timeout');
+
+                (mockPlaidExchangeToken as jest.Mock).mockResolvedValue({
+                    access_token: 'access-token-xyz',
+                    item_id: 'item-id-123',
+                });
+                (mockPlaidItemGet as jest.Mock).mockResolvedValue({
+                    item: { institution_id: 'ins_123' },
+                });
+                (mockPlaidGetInstitution as jest.Mock).mockResolvedValue({
+                    institution: { name: 'Test Bank' },
+                });
+                (mockEncrypt as jest.Mock).mockReturnValue('encrypted-token');
+                
+                // Mock the transaction to throw a non-constraint error
+                (mockUnitOfWork.executeTransaction as jest.Mock).mockImplementation(async (fn) => fn());
+                (mockUnitOfWork.plaidItems.create as jest.Mock).mockRejectedValue(dbError);
+
+                const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow('Connection timeout');
+            });
+        });
+
+        describe('Plaid API Error Handling', () => {
+            it('should throw ValidationError for INVALID_PUBLIC_TOKEN', async () => {
+                const plaidError = {
+                    error_code: 'INVALID_PUBLIC_TOKEN',
+                    message: 'The public token is invalid'
+                };
+
+                (mockPlaidExchangeToken as jest.Mock).mockRejectedValue(plaidError);
+
+                const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow(ValidationError);
+            });
+
+            it('should throw ApiError for PUBLIC_TOKEN_EXCHANGE_FAILED', async () => {
+                const plaidError = {
+                    error_code: 'PUBLIC_TOKEN_EXCHANGE_FAILED',
+                    message: 'Token exchange failed'
+                };
+
+                (mockPlaidExchangeToken as jest.Mock).mockRejectedValue(plaidError);
+
+                const { context, request } = createExchangeTokenParams('550e8400-e29b-41d4-a716-446655440000', 'public-test-token-123456789');
+                await expect(
+                    testExchangeFunction(context, request)
+                ).rejects.toThrow('Failed to exchange public token with Plaid');
+            });
         });
     });
 
@@ -171,6 +405,7 @@ describe('Plaid Service', () => {
             findById: jest.fn(),
             findByUserId: jest.fn(),
             findByPlaidItemId: jest.fn(),
+            findByIdAndUserId: jest.fn(),
             update: jest.fn(),
             archive: jest.fn(),
             hasReachedItemLimit: jest.fn(),
@@ -200,6 +435,7 @@ describe('Plaid Service', () => {
             findById: jest.fn(),
             findByUserId: jest.fn(),
             findByPlaidItemId: jest.fn(),
+            findByIdAndUserId: jest.fn(),
             update: jest.fn(),
             archive: jest.fn(),
             hasReachedItemLimit: jest.fn(),
@@ -217,6 +453,7 @@ describe('Plaid Service', () => {
                 last_successful_sync: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
+                archived_at: null,
             };
 
             mockRepository.findById.mockResolvedValue(mockInstitution);
@@ -250,6 +487,7 @@ describe('Plaid Service', () => {
                 last_successful_sync: null,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
+                archived_at: null,
             };
 
             mockRepository.findById.mockResolvedValue(mockInstitution);

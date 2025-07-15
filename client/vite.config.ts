@@ -20,4 +20,6 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "../dist/public"),
     emptyOutDir: true,
   },
+  // Configure Vite to load .env files from the project root
+  envDir: path.resolve(__dirname, ".."),
 });

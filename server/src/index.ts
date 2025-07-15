@@ -1,6 +1,6 @@
 // src/index.ts
+import config from './config/env'; // This MUST be the first import
 import express, { Express, Request, Response } from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import { httpRequestDurationSeconds, httpRequestsTotal } from './metrics';
 import logger from './logger';
@@ -8,13 +8,25 @@ import pinoHttp from 'pino-http';
 import { randomUUID } from 'crypto';
 import mainRouter from './api/routes';
 import { errorHandler } from './middleware/error.middleware';
+import { ConfigurationError } from './utils/errors';
 
-// Load environment variables from .env file
-dotenv.config();
+// Handle configuration errors gracefully
+process.on('uncaughtException', (error) => {
+    if (error instanceof ConfigurationError) {
+        console.error('FATAL_ERROR: Configuration validation failed');
+        console.error(error.message);
+        if (error.details?.message) {
+            console.error(error.details.message);
+        }
+        process.exit(1);
+    }
+    // Re-throw other uncaught exceptions
+    throw error;
+});
 
 // Initialize the Express application
 const app: Express = express();
-const port = process.env.PORT || 3000;
+const port = config.PORT;
 
 app.use(pinoHttp({
   logger,
@@ -29,8 +41,25 @@ app.use(pinoHttp({
 }));
 
 // --- Global Middleware ---
-// Enable Cross-Origin Resource Sharing
-app.use(cors());
+// Enable Cross-Origin Resource Sharing with development-specific configuration
+app.use(cors({
+  origin: config.NODE_ENV === 'development' 
+    ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://127.0.0.1:3000']
+    : true, // In production, configure this more restrictively
+  credentials: true,
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type', 
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'X-Request-Id'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  optionsSuccessStatus: 200 // For legacy browser support
+}));
+
 // Enable JSON body parsing
 app.use(express.json());
 

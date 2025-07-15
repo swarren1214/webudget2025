@@ -1,6 +1,6 @@
 // server/src/repositories/interfaces/plaid-item.repository.interface.ts
 
-import { PlaidItem, ItemStatus } from '../plaid.repository';
+import { PlaidItem, ItemStatus } from '../interfaces';
 
 /**
  * Represents the data needed to create a new Plaid item
@@ -41,6 +41,15 @@ export interface PlaidItemRepository {
      * @returns The Plaid item or null if not found
      */
     findById(id: number): Promise<PlaidItem | null>;
+
+    /**
+     * Finds a Plaid item by its internal ID and user ID in a single query
+     * This is more efficient than separate findById + ownership check
+     * @param id - The internal database ID
+     * @param userId - The user's ID who should own the item
+     * @returns The Plaid item or null if not found or not owned by user
+     */
+    findByIdAndUserId(id: number, userId: string): Promise<PlaidItem | null>;
 
     /**
      * Finds all Plaid items for a specific user

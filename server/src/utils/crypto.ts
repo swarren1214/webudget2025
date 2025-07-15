@@ -1,6 +1,7 @@
 // server/src/utils/crypto.ts
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import config from '../config/env';
 
 const { ENCRYPTION_KEY } = process.env;
 
@@ -11,7 +12,7 @@ if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
 
 const ALGORITHM = 'aes-256-gcm';
 // The key must be a buffer for the crypto functions.
-const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+const key = Buffer.from(config.ENCRYPTION_KEY, 'hex');
 
 /**
  * Encrypts a plaintext string using AES-256-GCM.

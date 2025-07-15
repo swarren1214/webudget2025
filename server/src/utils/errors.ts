@@ -65,6 +65,58 @@ export class TooManyRequestsError extends ApiError {
     }
 }
 
+/**
+ * Configuration error for invalid environment variables or system configuration
+ * This error is thrown during application startup when required configuration is missing or invalid
+ */
+export class ConfigurationError extends Error {
+    constructor(message: string, public readonly details?: any) {
+        super(message);
+        this.name = 'ConfigurationError';
+        Object.setPrototypeOf(this, ConfigurationError.prototype);
+    }
+}
+
+/**
+ * Database constraint error configuration for reusable error handling
+ */
+export interface DatabaseConstraintConfig {
+    constraintName: string;
+    errorCode: string;
+    createMessage: (identifier?: string) => string;
+}
+
+/**
+ * Common database constraint configurations
+ */
+export const DATABASE_CONSTRAINTS: Record<string, DatabaseConstraintConfig> = {
+    PLAID_ITEM_UNIQUE: {
+        constraintName: 'plaid_items_plaid_item_id_key',
+        errorCode: '23505',
+        createMessage: (itemId?: string) => 
+            `Institution account is already connected. Plaid item ID ${itemId} already exists for this user.`
+    },
+    // Add more constraint configurations as needed
+};
+
+/**
+ * Generic database error handler for PostgreSQL constraint violations
+ * @param error - The database error
+ * @param constraintConfig - Configuration for the specific constraint
+ * @param identifier - Optional identifier for the error message
+ */
+export const handleDatabaseConstraintError = (
+    error: any,
+    constraintConfig: DatabaseConstraintConfig,
+    identifier?: string
+): never => {
+    if (error.code === constraintConfig.errorCode && error.constraint === constraintConfig.constraintName) {
+        throw new ConflictError(constraintConfig.createMessage(identifier));
+    }
+    // Re-throw other database errors as they are
+    throw error;
+};
+
 // Map error names to error codes for API responses
 export const ERROR_CODES: Record<string, string> = {
     ApiError: 'API_ERROR',
@@ -74,4 +126,5 @@ export const ERROR_CODES: Record<string, string> = {
     ForbiddenError: 'FORBIDDEN',
     ConflictError: 'CONFLICT',
     TooManyRequestsError: 'TOO_MANY_REQUESTS',
+    ConfigurationError: 'CONFIGURATION_ERROR',
 };

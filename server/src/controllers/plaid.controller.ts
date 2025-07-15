@@ -1,16 +1,21 @@
 // server/src/controllers/plaid.controller.ts
 
 import { Response, NextFunction } from 'express';
-import { createLinkToken, exchangePublicToken } from '../services/plaid.service';
+import { 
+    createLinkToken, 
+    exchangePublicToken,
+    PlaidTokenExchangeContext,
+    ExchangeTokenRequest
+} from '../services/plaid.service';
 import { DependencyContainer } from '../config/dependencies';
 import { UnauthorizedError, ValidationError } from '../utils/errors';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 // Get dependencies from the container
 const container = DependencyContainer.getInstance();
-const plaidItemRepository = container.getPlaidItemRepository();
 const plaidWrappers = container.getPlaidClientWrappers();
 const { encrypt } = container.getCryptoUtils();
+const unitOfWork = container.createUnitOfWork();
 
 export const createLinkTokenHandler = async (
     req: AuthRequest,
@@ -50,15 +55,20 @@ export const exchangePublicTokenHandler = async (
             throw new ValidationError('publicToken is required');
         }
 
-        const newItem = await exchangePublicToken(
-            plaidWrappers.itemPublicTokenExchange,
-            plaidWrappers.itemGet,
-            plaidWrappers.institutionsGetById,
+        const context: PlaidTokenExchangeContext = {
+            plaidExchangeToken: plaidWrappers.itemPublicTokenExchange,
+            plaidItemGet: plaidWrappers.itemGet,
+            plaidGetInstitution: plaidWrappers.institutionsGetById,
             encrypt,
-            plaidItemRepository,
+            unitOfWork,
+        };
+
+        const request: ExchangeTokenRequest = {
             userId,
-            publicToken
-        );
+            publicToken,
+        };
+
+        const newItem = await exchangePublicToken(context, request);
 
         res.status(202).json(newItem);
     } catch (error) {

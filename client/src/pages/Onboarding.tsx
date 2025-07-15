@@ -1,19 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
+import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/api';
+import { supabase } from '@/lib/supabaseClient';
+import { errorLog } from '@/lib/utils';
+import { PlaidErrorBoundary, usePlaidErrorHandler } from '@/components/PlaidErrorBoundary';
 
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [plaidLinked, setPlaidLinked] = useState(false);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  
+  // Error handling for Plaid operations
+  const { handlePlaidError } = usePlaidErrorHandler();
 
-  // Simulated Plaid token for example purposes
+  // Verify session state on component mount
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      // Session validation completed
+    };
+    checkSession();
+  }, []);
+
+  // Get link token when step 2 is reached
+  useEffect(() => {
+    if (step === 2 && !linkToken) {
+      const checkSessionBeforeAPI = async () => {
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        // Create Plaid link token
+        try {
+          const data = await createPlaidLinkToken();
+          setLinkToken(data.linkToken);
+        } catch (error) {
+          errorLog('[Onboarding] createPlaidLinkToken FAILED:', error);
+          handlePlaidError(error);
+        }
+      };
+
+      checkSessionBeforeAPI();
+    }
+  }, [step, linkToken]);
+
+  // ✅ BEST PRACTICE: Conditional hook initialization to prevent race conditions
+  // usePlaidLink requires a token, so we provide fallback when linkToken is not ready
   const { open, ready } = usePlaidLink({
-    token: 'your-generated-link-token',
-    onSuccess: (public_token, metadata) => {
+    token: linkToken || '', // Fallback to empty string when linkToken is null
+    onSuccess: (public_token: string, metadata: any) => {
+      exchangePlaidPublicToken(public_token, 1);
       setPlaidLinked(true);
       setStep(step + 1);
     },
   });
+
+  // ✅ IMMUTABLE STATE: Only consider ready when BOTH conditions are met
+  const isPlaidReady = Boolean(linkToken) && ready;
+
+  // Plaid Link readiness monitoring
+  useEffect(() => {
+    // Monitor link readiness state changes
+  }, [linkToken, ready, isPlaidReady, step]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -44,16 +91,33 @@ const OnboardingPage: React.FC = () => {
         );
       case 2:
         return (
-          <div className="text-center">
-            <h2 className="text-xl font-semibold mb-4">Connect Bank Account</h2>
-            <button
-              onClick={() => open()}
-              disabled={!ready}
-              className="py-2 px-4 bg-big-grinch text-white rounded-lg font-semibold hover:bg-green-700 transition"
-            >
-              {plaidLinked ? 'Account Linked!' : 'Connect with Plaid'}
-            </button>
-          </div>
+          <PlaidErrorBoundary
+            onError={(error, errorInfo) => {
+              // Additional error reporting could go here
+              // e.g., send to analytics, error tracking service
+              errorLog('[Onboarding] Plaid error boundary triggered:', { error: error.message });
+            }}
+          >
+            <div className="text-center">
+              <h2 className="text-xl font-semibold mb-4">Connect Bank Account</h2>
+              <button
+                onClick={() => {
+                  if (isPlaidReady) {
+                    open();
+                  }
+                }}
+                disabled={!isPlaidReady}
+                className="py-2 px-4 bg-big-grinch text-white rounded-lg font-semibold hover:bg-green-700 transition"
+                style={{ 
+                  opacity: !isPlaidReady ? 0.5 : 1,
+                  cursor: !isPlaidReady ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {plaidLinked ? 'Account Linked!' : 'Connect with Plaid'}
+                {!isPlaidReady && <span className="ml-2 text-xs">(Loading...)</span>}
+              </button>
+            </div>
+          </PlaidErrorBoundary>
         );
       case 3:
         return (

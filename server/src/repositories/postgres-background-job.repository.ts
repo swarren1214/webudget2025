@@ -5,127 +5,115 @@ import {
     BackgroundJob,
     CreateBackgroundJobData
 } from './interfaces/background-job.repository.interface';
-import { TransactionManager } from './transaction.manager';
+import { DbConnection } from './interfaces';
 import logger from '../logger';
 
 export class PostgresBackgroundJobRepository implements BackgroundJobRepository {
-    constructor(
-        private transactionManager: TransactionManager
-    ) { }
+    constructor(private db: DbConnection) { }
 
     async create(jobData: CreateBackgroundJobData): Promise<BackgroundJob> {
-        return this.transactionManager.executeInTransaction(async (client) => {
-            const query = `
-                INSERT INTO background_jobs (job_type, payload, status)
-                VALUES ($1, $2, 'queued')
-                RETURNING *
-            `;
+        const query = `
+            INSERT INTO background_jobs (job_type, payload, status)
+            VALUES ($1, $2, 'queued')
+            RETURNING *
+        `;
 
-            const values = [
-                jobData.jobType,
-                JSON.stringify(jobData.payload)
-            ];
+        const values = [
+            jobData.jobType,
+            JSON.stringify(jobData.payload)
+        ];
 
-            const result = await client.query(query, values);
-            const job = this.mapToBackgroundJob(result.rows[0]);
+        const result = await this.db.query(query, values);
+        const job = this.mapToBackgroundJob(result.rows[0]);
 
-            logger.info('Created background job', {
-                jobType: jobData.jobType,
-                jobId: job.id
-            });
-
-            return job;
+        logger.info('Created background job', {
+            jobType: jobData.jobType,
+            jobId: job.id
         });
+
+        return job;
     }
 
     async findNextAvailable(jobTypes?: string[]): Promise<BackgroundJob | null> {
-        return this.transactionManager.executeInTransaction(async (client) => {
-            let query = `
-                SELECT * FROM background_jobs
-                WHERE status = 'queued'
-            `;
+        let query = `
+            SELECT * FROM background_jobs
+            WHERE status = 'queued'
+        `;
 
-            const values: any[] = [];
+        const values: any[] = [];
 
-            if (jobTypes && jobTypes.length > 0) {
-                query += ` AND job_type = ANY($1)`;
-                values.push(jobTypes);
-            }
+        if (jobTypes && jobTypes.length > 0) {
+            query += ` AND job_type = ANY($1)`;
+            values.push(jobTypes);
+        }
 
-            query += ` ORDER BY created_at ASC
-                      LIMIT 1
-                      FOR UPDATE SKIP LOCKED`;
+        query += ` ORDER BY created_at ASC
+                   LIMIT 1
+                   FOR UPDATE SKIP LOCKED`;
 
-            const result = await client.query(query, values);
+        const result = await this.db.query(query, values);
 
-            if (result.rows.length === 0) {
-                return null;
-            }
+        if (result.rows.length === 0) {
+            return null;
+        }
 
-            return this.mapToBackgroundJob(result.rows[0]);
-        });
+        return this.mapToBackgroundJob(result.rows[0]);
     }
 
     async markAsRunning(id: number): Promise<BackgroundJob> {
-        return this.transactionManager.executeInTransaction(async (client) => {
-            const query = `
-                UPDATE background_jobs
-                SET status = 'running', 
-                    last_attempt_at = NOW(),
-                    attempts = attempts + 1
-                WHERE id = $1
-                RETURNING *
-            `;
+        const query = `
+            UPDATE background_jobs
+            SET status = 'running', 
+                last_attempt_at = NOW(),
+                attempts = attempts + 1
+            WHERE id = $1
+            RETURNING *
+        `;
 
-            const result = await client.query(query, [id]);
+        const result = await this.db.query(query, [id]);
 
-            if (result.rows.length === 0) {
-                throw new Error(`Background job with ID ${id} not found`);
-            }
+        if (result.rows.length === 0) {
+            throw new Error(`Background job with ID ${id} not found`);
+        }
 
-            return this.mapToBackgroundJob(result.rows[0]);
-        });
+        return this.mapToBackgroundJob(result.rows[0]);
     }
 
     async markAsCompleted(id: number): Promise<BackgroundJob> {
-        return this.transactionManager.executeInTransaction(async (client) => {
-            const query = `
-                UPDATE background_jobs
-                SET status = 'completed'
-                WHERE id = $1
-                RETURNING *
-            `;
+        const query = `
+            UPDATE background_jobs
+            SET status = 'completed'
+            WHERE id = $1
+            RETURNING *
+        `;
 
-            const result = await client.query(query, [id]);
+        const result = await this.db.query(query, [id]);
 
-            if (result.rows.length === 0) {
-                throw new Error(`Background job with ID ${id} not found`);
-            }
+        if (result.rows.length === 0) {
+            throw new Error(`Background job with ID ${id} not found`);
+        }
 
-            logger.info('Background job completed', { jobId: id });
-            return this.mapToBackgroundJob(result.rows[0]);
-        });
+        logger.info('Background job completed', { jobId: id });
+        return this.mapToBackgroundJob(result.rows[0]);
     }
 
     async markAsFailed(id: number, error: string): Promise<BackgroundJob> {
-        return this.transactionManager.executeInTransaction(async (client) => {
-            const query = `
-                UPDATE background_jobs
-                SET status = 'failed',
-                    last_error = $2
-                WHERE id = $1
-                RETURNING *
-            `;
+        const query = `
+            UPDATE background_jobs
+            SET status = 'failed',
+                last_error = $2
+            WHERE id = $1
+            RETURNING *
+        `;
 
-            const result = await client.query(query, [id, error]);
+        const result = await this.db.query(query, [id, error]);
 
-            if (result.rows.length === 0) {
-                throw new Error(`Background job with ID ${id} not found`);
-            }
+        if (result.rows.length === 0) {
+            throw new Error(`Background job with ID ${id} not found`);
+        }
 
-            logger.error('Background job failed', { jobId: id, error });
-            return this.mapToBackgroundJob(result.rows[0]);
-        });
+        logger.error('Background job failed', { jobId: id, error });
+        return this.mapToBackgroundJob(result.rows[0]);
     }
 
     private mapToBackgroundJob(row: any): BackgroundJob {
