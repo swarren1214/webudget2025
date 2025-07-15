@@ -13,6 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar } from "@/components/ui/avatar";
 import { Trash2 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { useLocation } from "wouter";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -36,7 +38,9 @@ export default function ProfileModal({ isOpen, onClose, user, onSave, onDelete }
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -71,6 +75,18 @@ export default function ProfileModal({ isOpen, onClose, user, onSave, onDelete }
     }
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({ title: "Logout failed", variant: "destructive" });
+    } else {
+      toast({ title: "You’ve been logged out" });
+      navigate("/login");
+    }
+    setIsLoggingOut(false);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -101,14 +117,29 @@ export default function ProfileModal({ isOpen, onClose, user, onSave, onDelete }
         </div>
         <DialogFooter className="flex flex-col gap-2 items-stretch">
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={isSaving || isDeleting}>Cancel</Button>
-            <Button onClick={handleSave} loading={isSaving} disabled={isSaving || isDeleting}>Save Changes</Button>
+            <Button variant="outline" onClick={onClose} disabled={isSaving || isDeleting || isLoggingOut}>Cancel</Button>
+            <Button onClick={handleSave} loading={isSaving} disabled={isSaving || isDeleting || isLoggingOut}>Save Changes</Button>
           </div>
-          <Button variant="destructive" onClick={handleDelete} loading={isDeleting} disabled={isSaving || isDeleting} className="mt-2 flex items-center gap-2">
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            loading={isDeleting}
+            disabled={isSaving || isDeleting || isLoggingOut}
+            className="mt-2 flex items-center gap-2"
+          >
             <Trash2 className="h-4 w-4" /> Delete Account
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleLogout}
+            loading={isLoggingOut}
+            disabled={isSaving || isDeleting || isLoggingOut}
+            className="mt-2"
+          >
+            Logout
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-} 
+}

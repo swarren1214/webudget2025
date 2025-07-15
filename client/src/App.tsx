@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AuthProvider } from "@/lib/AuthProvider";
-import { Route, Switch, Redirect } from "wouter";
+import { Route, Switch, Redirect, useLocation } from "wouter";
 import Layout from "@/components/layout/Layout";
 import LoginPage from "@/pages/Login";
 import SignUpPage from "@/pages/SignUp";
@@ -9,7 +9,7 @@ import Accounts from "@/pages/Accounts";
 import Transactions from "@/pages/Transactions";
 import Budgets from "@/pages/Budgets";
 import Transfers from "@/pages/Transfers";
-import Onboarding from "@/pages/Onboarding"; // ✅ Onboarding import
+import Onboarding from "@/pages/Onboarding";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { supabase } from "@/lib/supabaseClient";
@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabaseClient";
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -36,7 +37,22 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     };
 
     checkSession();
-  }, []);
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        // Signed out — immediately redirect to /login
+        setIsAuthenticated(false);
+        setHasOnboarded(null);
+        navigate("/login");
+      } else {
+        checkSession();
+      }
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   if (isAuthenticated === null || hasOnboarded === null) {
     return <div>Loading...</div>;
@@ -61,7 +77,7 @@ export default function App() {
           {/* Public Routes */}
           <Route path="/login" component={LoginPage} />
           <Route path="/signup" component={SignUpPage} />
-          <Route path="/onboarding" component={Onboarding} /> {/* ✅ New onboarding route */}
+          <Route path="/onboarding" component={Onboarding} />
           <Route path="/" component={() => <Redirect to="/login" />} />
 
           {/* Protected Routes */}
