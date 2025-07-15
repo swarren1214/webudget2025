@@ -4,13 +4,36 @@ import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/api';
 import { supabase } from '@/lib/supabaseClient';
 import { errorLog } from '@/lib/utils';
 import { PlaidErrorBoundary, usePlaidErrorHandler } from '@/components/PlaidErrorBoundary';
+import { useLocation } from 'wouter';
 
 const OnboardingPage: React.FC = () => {
+  const [, navigate] = useLocation();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
+  const handleSkipOnboarding = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase
+        .from('users')
+        .update({ has_onboarded: true })
+        .eq('supabase_user_id', user.id);
+
+      if (!error) {
+        navigate('/dashboard');
+      } else {
+        console.error('Failed to update onboarding flag:', error);
+      }
+    }
+  };
   const [step, setStep] = useState(1);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [plaidLinked, setPlaidLinked] = useState(false);
   const [linkToken, setLinkToken] = useState<string | null>(null);
-  
+
   // Error handling for Plaid operations
   const { handlePlaidError } = usePlaidErrorHandler();
 
@@ -28,7 +51,7 @@ const OnboardingPage: React.FC = () => {
     if (step === 2 && !linkToken) {
       const checkSessionBeforeAPI = async () => {
         const { data: sessionData } = await supabase.auth.getSession();
-        
+
         // Create Plaid link token
         try {
           const data = await createPlaidLinkToken();
@@ -108,7 +131,7 @@ const OnboardingPage: React.FC = () => {
                 }}
                 disabled={!isPlaidReady}
                 className="py-2 px-4 bg-big-grinch text-white rounded-lg font-semibold hover:bg-green-700 transition"
-                style={{ 
+                style={{
                   opacity: !isPlaidReady ? 0.5 : 1,
                   cursor: !isPlaidReady ? 'not-allowed' : 'pointer'
                 }}
@@ -180,6 +203,20 @@ const OnboardingPage: React.FC = () => {
         </div>
       </div>
       <div className="py-6 text-white text-xs text-center">
+        <div className="flex justify-between items-center px-8 mb-4">
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-500 hover:underline"
+          >
+            Log out
+          </button>
+          <button
+            onClick={handleSkipOnboarding}
+            className="text-sm text-gray-600 hover:underline"
+          >
+            Skip for now
+          </button>
+        </div>
         &copy; {new Date().getFullYear()} WeBudget. All rights reserved.
       </div>
     </div>

@@ -20,12 +20,12 @@ function Sidebar({ className, onClose }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex flex-col h-full bg-big-grinch text-white shadow-lg",
+        "flex flex-col min-h-screen bg-big-grinch bg-cover bg-no-repeat text-white shadow-lg",
         className
       )}
     >
       {/* Logo */}
-      <div className="flex items-center justify-center h-20 px-6 border-b border-white/20">
+      <div className="flex items-center justify-center h-20 px-6">
         <img
           src="/logo-white.png"
           alt="WeBudget Logo"
@@ -48,7 +48,7 @@ function Sidebar({ className, onClose }: SidebarProps) {
               className={cn(
                 "group flex items-center w-full px-3 py-2 rounded-md transition-colors text-sm font-medium",
                 isActive
-                  ? "bg-white text-big-grinch"
+                  ? "bg-white/15 text-white"
                   : "hover:bg-white/10 hover:text-white"
               )}
             >

@@ -31,7 +31,7 @@ function Layout({ children }: LayoutProps) {
       <div>
         {/* Desktop Sidebar */}
         <div className="hidden lg:block fixed inset-y-0 left-0 w-64 z-30">
-          <Sidebar className="h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700" />
+          <Sidebar />
         </div>
 
         {/* Mobile Sidebar Overlay */}

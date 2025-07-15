@@ -2,7 +2,13 @@
 import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { ConfigurationError } from '../utils/errors';
+import dotenv from 'dotenv';
+import path from 'path';
 
+// Load the .env file from the project root
+dotenv.config({
+    path: path.resolve(__dirname, '../../../.env'),
+});
 
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -20,13 +26,9 @@ const envSchema = z.object({
 let config: z.infer<typeof envSchema>;
 
 try {
-    // 1. Validate process.env against the schema
     config = envSchema.parse(process.env);
 } catch (error) {
-    // 2. If validation fails, format the error for readability
     const validationError = fromZodError(error as z.ZodError);
-
-    // 3. Throw a ConfigurationError with detailed information
     throw new ConfigurationError(
         'Invalid environment variables found',
         {
@@ -36,5 +38,4 @@ try {
     );
 }
 
-// 4. Export the validated and typed configuration object
 export default config;
