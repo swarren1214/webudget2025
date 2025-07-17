@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { errorLog } from '@/lib/utils';
 import { PlaidErrorBoundary, usePlaidErrorHandler } from '@/components/PlaidErrorBoundary';
 import { useLocation } from 'wouter';
+import Cropper, { Area } from 'react-easy-crop';
+import { getCroppedImg } from '@/lib/cropUtils'; // Utility function to crop the image
 
 const OnboardingPage: React.FC = () => {
   const [, navigate] = useLocation();
@@ -12,6 +14,29 @@ const OnboardingPage: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
+  };
+
+  const handlePlaidSuccess = async (public_token: string) => {
+    try {
+      await exchangePlaidPublicToken(public_token, 1);
+      setPlaidLinked(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase
+          .from('users')
+          .update({ has_onboarded: true })
+          .eq('supabase_user_id', user.id);
+
+        if (!error) {
+          navigate('/dashboard');
+        } else {
+          console.error('Failed to update onboarding flag:', error);
+        }
+      }
+    } catch (error) {
+      errorLog('[Onboarding] Plaid success handler failed:', error);
+    }
   };
 
   const handleSkipOnboarding = async () => {
@@ -70,11 +95,7 @@ const OnboardingPage: React.FC = () => {
   // usePlaidLink requires a token, so we provide fallback when linkToken is not ready
   const { open, ready } = usePlaidLink({
     token: linkToken || '', // Fallback to empty string when linkToken is null
-    onSuccess: (public_token: string, metadata: any) => {
-      exchangePlaidPublicToken(public_token, 1);
-      setPlaidLinked(true);
-      setStep(step + 1);
-    },
+    onSuccess: handlePlaidSuccess,
   });
 
   // ✅ IMMUTABLE STATE: Only consider ready when BOTH conditions are met
@@ -85,9 +106,32 @@ const OnboardingPage: React.FC = () => {
     // Monitor link readiness state changes
   }, [linkToken, ready, isPlaidReady, step]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setProfilePhoto(e.target.files[0]);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [cropping, setCropping] = useState(false);
+
+  const handleCropComplete = (croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
+  const handleSaveCroppedImage = async () => {
+    if (!profilePhoto) {
+      console.error('No profile photo selected.');
+      return;
+    }
+    if (!croppedAreaPixels) {
+      console.error('No cropped area defined.');
+      return;
+    }
+    try {
+      setCropping(true);
+      const croppedImage = await getCroppedImg(profilePhoto, croppedAreaPixels);
+      setProfilePhoto(croppedImage);
+      setCropping(false);
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      setCropping(false);
     }
   };
 
@@ -97,17 +141,39 @@ const OnboardingPage: React.FC = () => {
         return (
           <div className="text-center">
             <h2 className="text-xl font-semibold mb-4">Upload Profile Photo</h2>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoChange}
-              className="mb-4"
-            />
-            {profilePhoto && (
-              <img
-                src={URL.createObjectURL(profilePhoto)}
-                alt="Preview"
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
+            {profilePhoto ? (
+              <div className="relative w-full h-64">
+                <div className="absolute top-0 left-0 right-0 bottom-16">
+                  <Cropper
+                    image={URL.createObjectURL(profilePhoto)}
+                    crop={crop}
+                    zoom={zoom}
+                    aspect={1}
+                    onCropChange={setCrop}
+                    onZoomChange={setZoom}
+                    onCropComplete={handleCropComplete}
+                  />
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 flex justify-center">
+                  <button
+                    onClick={handleSaveCroppedImage}
+                    className="mt-4 px-4 py-2 bg-big-grinch text-white rounded-lg font-semibold hover:bg-green-700"
+                    disabled={cropping}
+                  >
+                    {cropping ? 'Saving...' : 'Save Photo'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    setProfilePhoto(e.target.files[0]);
+                  }
+                }}
+                className="mb-4"
               />
             )}
           </div>

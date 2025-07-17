@@ -33,6 +33,10 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
           .single();
 
         setHasOnboarded(userData?.has_onboarded ?? false);
+
+        if (userData?.has_onboarded) {
+          navigate("/dashboard");
+        }
       }
     };
 
