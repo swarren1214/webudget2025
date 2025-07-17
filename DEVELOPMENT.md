@@ -83,7 +83,7 @@ docker compose -f docker-compose.dev.yml logs -f db
 docker compose -f docker-compose.dev.yml run --rm api npm run migrate:up
 
 # Connect to database
-docker compose -f docker-compose.dev.yml exec db psql -U webudget_user -d webudget_db
+docker compose -f docker-compose.dev.yml exec db psql -U myuser -d webudget_db
 ```
 
 ### Clean Reset
