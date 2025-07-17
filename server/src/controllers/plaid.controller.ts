@@ -10,6 +10,9 @@ import {
 import { DependencyContainer } from '../config/dependencies';
 import { UnauthorizedError, ValidationError } from '../utils/errors';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { RepositoryFactory } from '../repositories/repository.factory';
+import pool from '../config/database';
+import logger from '../logger';
 
 // Get dependencies from the container
 const container = DependencyContainer.getInstance();
@@ -55,6 +58,14 @@ export const exchangePublicTokenHandler = async (
             throw new ValidationError('publicToken is required');
         }
 
+        // Ensure the user exists in the users table
+        const userExistsQuery = 'SELECT 1 FROM users WHERE supabase_user_id = $1';
+        const { rowCount } = await pool.query(userExistsQuery, [userId]);
+
+        if (rowCount === 0) {
+            throw new ValidationError('User does not exist in the database');
+        }
+
         const context: PlaidTokenExchangeContext = {
             plaidExchangeToken: plaidWrappers.itemPublicTokenExchange,
             plaidItemGet: plaidWrappers.itemGet,
@@ -72,6 +83,12 @@ export const exchangePublicTokenHandler = async (
 
         res.status(202).json(newItem);
     } catch (error) {
+        logger.error('Error in exchangePublicTokenHandler', {
+            error: (error as any).message,
+            stack: (error as any).stack,
+            requestId: req.id,
+            userId: req.user?.id,
+        });
         next(error);
     }
 };
