@@ -1,33 +1,22 @@
-import { pgTable, text, uuid, serial, integer, real, boolean, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  uuid,
+  serial,
+  integer,
+  real,
+  boolean,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User table
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  supabase_user_id: uuid("supabase_user_id").notNull().unique(), // new foreign key to auth.users
-  username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
-  fullName: text("full_name").notNull(),
-  has_onboarded: boolean("has_onboarded").default(false),
-});
-
-export const insertUserSchema = createInsertSchema(users).pick({
-  supabase_user_id: true,
-  username: true,
-  email: true,
-  fullName: true,
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-// Account table
+// --- Account Table ---
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // checking, savings, credit card, etc.
+  type: text("type").notNull(),
   balance: real("balance").notNull().default(0),
   accountNumber: text("account_number").notNull(),
   institutionName: text("institution_name").notNull(),
@@ -49,11 +38,10 @@ export const insertAccountSchema = createInsertSchema(accounts).pick({
   plaidItemId: true,
   isConnected: true,
 });
-
 export type InsertAccount = z.infer<typeof insertAccountSchema>;
 export type Account = typeof accounts.$inferSelect;
 
-// Transaction table
+// --- Transactions Table ---
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   accountId: integer("account_id").notNull(),
@@ -74,11 +62,10 @@ export const insertTransactionSchema = createInsertSchema(transactions).pick({
   isIncome: true,
   plaidTransactionId: true,
 });
-
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 
-// Budget Categories table
+// --- Budget Categories Table ---
 export const budgetCategories = pgTable("budget_categories", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -95,11 +82,10 @@ export const insertBudgetCategorySchema = createInsertSchema(budgetCategories).p
   color: true,
   icon: true,
 });
-
 export type InsertBudgetCategory = z.infer<typeof insertBudgetCategorySchema>;
 export type BudgetCategory = typeof budgetCategories.$inferSelect;
 
-// Transfer table
+// --- Transfers Table ---
 export const transfers = pgTable("transfers", {
   id: serial("id").primaryKey(),
   fromAccountId: integer("from_account_id").notNull(),
@@ -107,8 +93,8 @@ export const transfers = pgTable("transfers", {
   amount: real("amount").notNull(),
   date: timestamp("date").notNull(),
   note: text("note"),
-  status: text("status").notNull(), // pending, completed, failed
-  plaidTransferId: text("plaid_transfer_id"), // Plaid transfer ID
+  status: text("status").notNull(),
+  plaidTransferId: text("plaid_transfer_id"),
 });
 
 export const insertTransferSchema = createInsertSchema(transfers).pick({
@@ -120,19 +106,16 @@ export const insertTransferSchema = createInsertSchema(transfers).pick({
   status: true,
   plaidTransferId: true,
 });
-
 export type InsertTransfer = z.infer<typeof insertTransferSchema>;
 export type Transfer = typeof transfers.$inferSelect;
 
-// Types for Plaid API
+// --- Plaid API Schemas ---
 export const plaidLinkTokenSchema = z.object({
   link_token: z.string(),
 });
-
 export type PlaidLinkToken = z.infer<typeof plaidLinkTokenSchema>;
 
 export const plaidExchangeSchema = z.object({
   publicToken: z.string(),
 });
-
 export type PlaidExchange = z.infer<typeof plaidExchangeSchema>;

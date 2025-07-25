@@ -1,10 +1,12 @@
 // server/src/api/routes/metrics.routes.ts
+
 import { Router } from 'express';
 import { getMetrics } from '../../controllers/metrics.controller';
+import asyncHandler from '../../middleware/asyncHandler';
 
 const router = Router();
 
-// The metrics endpoint should be at the root, e.g., GET /metrics
-router.get('/metrics', getMetrics);
+// GET /metrics
+router.get('/metrics', asyncHandler(getMetrics));
 
 export default router;

@@ -29,18 +29,18 @@ function Transactions() {
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
   
   // Fetch transactions data
-  const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ['/api/transactions'],
+  const { data: transactions, isLoading: isLoadingTransactions, error: transactionsError } = useQuery<Transaction[]>({
+    queryKey: ['/transactions'],
   });
   
   // Fetch accounts data for filtering
-  const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
-    queryKey: ['/api/accounts'],
+  const { data: accounts, isLoading: isLoadingAccounts, error: accountsError } = useQuery<Account[]>({
+    queryKey: ['/accounts'],
   });
   
   // Fetch budget categories
-  const { data: budgetCategories, isLoading: isLoadingBudgets } = useQuery({
-    queryKey: ['/api/budget-categories'],
+  const { data: budgetCategories, isLoading: isLoadingBudgets, error: budgetCategoriesError } = useQuery({
+    queryKey: ['/budget-categories'],
     queryFn: getBudgetCategories,
   });
   
@@ -54,7 +54,7 @@ function Transactions() {
         title: "Success",
         description: "Transactions synced successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/transactions'] });
     },
     onError: () => {
       toast({
@@ -111,6 +111,15 @@ function Transactions() {
       syncMutation.mutate(parseInt(selectedAccount));
     }
   };
+  
+  // Display error messages if any
+  if (transactionsError || accountsError || budgetCategoriesError) {
+    return (
+      <div className="text-center py-10">
+        <p className="text-red-500">Failed to load data. Please try again later.</p>
+      </div>
+    );
+  }
   
   return (
     <>
@@ -179,7 +188,7 @@ function Transactions() {
         open={!!selectedTransaction}
         onOpenChange={(open) => { if (!open) setSelectedTransaction(null); }}
         transaction={selectedTransaction}
-        budgets={budgetCategories ? budgetCategories.map(b => ({ name: b.name, color: b.color })) : []}
+        budgets={budgetCategories ? budgetCategories.map(b => ({ name: b.name, color: b.color, icon: 'default-icon' })) : []}
       />
       
       <AddTransactionModal open={showAddTransactionModal} onOpenChange={setShowAddTransactionModal} accounts={accounts || []} categories={categories} />

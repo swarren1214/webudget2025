@@ -58,8 +58,8 @@ const ConnectAccountModal = ({ isOpen, onClose, accountId }: ConnectAccountModal
         description: "Your bank account has been successfully connected.",
       });
       onClose();
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['/transactions'] });
     } catch (error) {
       toast({
         title: "Connection Failed",
@@ -106,7 +106,7 @@ const ConnectAccountModal = ({ isOpen, onClose, accountId }: ConnectAccountModal
       return response;
     },
     onSuccess: (data) => {
-      setLinkToken(data.link_token);
+      setLinkToken(data.linkToken);
     },
     onError: () => {
       toast({

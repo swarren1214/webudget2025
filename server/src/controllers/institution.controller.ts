@@ -7,6 +7,7 @@ import { getUserInstitutions, archiveInstitution, canLinkAnotherAccount } from '
 import { getInstitutionForUser, parseInstitutionId } from '../services/institution.service';
 import { NotFoundError } from '../utils/errors';
 import { ItemStatus, PlaidItem } from '../repositories/interfaces/plaid-types';
+import { supabase } from '../config/supabaseClient'
 
 const container = DependencyContainer.getInstance();
 const plaidItemRepository = container.getPlaidItemRepository();
@@ -25,7 +26,12 @@ export const getInstitutionsHandler = async (
     try {
         const userId = req.user!.id;
 
-        const institutions = await getUserInstitutions(userId, plaidItemRepository);
+        const { data: institutions, error } = await supabase
+          .from('institutions')
+          .select('*')
+          .eq('user_id', userId);
+
+        if (error) throw new Error(error.message);
 
         res.status(200).json({
             data: institutions,
@@ -50,7 +56,11 @@ export const deleteInstitutionHandler = async (
         const { institutionId } = req.params;
         const id = parseInstitutionId(institutionId);
 
-        await archiveInstitution(userId, id, plaidItemRepository);
+        await supabase
+          .from('institutions')
+          .update({ archived: true })
+          .eq('user_id', userId)
+          .eq('id', id);
 
         res.status(200).json({
             message: 'Institution archived successfully'
@@ -85,7 +95,14 @@ export const refreshInstitutionHandler = async (
 
         // Validate institution ID and verify ownership in single optimized query
         const id = parseInstitutionId(institutionId);
-        const institution = await getInstitutionForUser(id, userId, plaidItemRepository);
+        const { data: institution, error } = await supabase
+          .from('institutions')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('id', id)
+          .single();
+
+        if (error) throw new Error(error.message);
 
         // Check if already syncing
         if (checkSyncStatus(institution)) {
@@ -121,7 +138,12 @@ export const canLinkAccountHandler = async (
         const userId = req.user!.id;
         const maxAccounts = parseInt(req.query.maxAccounts as string) || 10;
 
-        const canLink = await canLinkAnotherAccount(userId, plaidItemRepository, maxAccounts);
+        const { count } = await supabase
+          .from('institutions')
+          .select('*', { count: 'exact' })
+          .eq('user_id', userId);
+
+        const canLink = (count ?? 0) < maxAccounts;
 
         res.status(200).json({
             canLink,

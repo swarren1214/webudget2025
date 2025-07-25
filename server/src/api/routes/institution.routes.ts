@@ -1,6 +1,6 @@
 // server/src/api/routes/institution.routes.ts
 
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import {
     getInstitutionsHandler,
     deleteInstitutionHandler,
@@ -8,31 +8,67 @@ import {
     canLinkAccountHandler
 } from '../../controllers/institution.controller';
 import { authMiddleware } from '../../middleware/auth.middleware';
-import { asyncHandler } from '../../middleware/error.middleware';
+import { AuthRequest } from '@/types/auth';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authMiddleware);
+// Adjust middleware to ensure compatibility with typings
+router.use(((req, res, next) => {
+    const authReq = req as unknown as AuthRequest;
+    authMiddleware(authReq, res, next);
+}) as RequestHandler);
 
+// Wrap handlers in properly typed RequestHandler
+const getInstitutionsHandlerWrapper: RequestHandler = async (req, res, next) => {
+    const authReq = req as unknown as AuthRequest;
+    await getInstitutionsHandler(authReq, res, next);
+};
+
+const deleteInstitutionHandlerWrapper: RequestHandler = async (req, res, next) => {
+    const authReq = req as unknown as AuthRequest;
+    await deleteInstitutionHandler(authReq, res, next);
+};
+
+const refreshInstitutionHandlerWrapper: RequestHandler = async (req, res, next) => {
+    const authReq = req as unknown as AuthRequest;
+    await refreshInstitutionHandler(authReq, res, next);
+};
+
+const canLinkAccountHandlerWrapper: RequestHandler = async (req, res, next) => {
+    const authReq = req as unknown as AuthRequest;
+    await canLinkAccountHandler(authReq, res, next);
+};
+
+// Adjust asyncHandler usage to resolve type compatibility issues
+const asyncHandlerWrapper = (handler: RequestHandler): RequestHandler => {
+    return async (req, res, next) => {
+        try {
+            await handler(req, res, next);
+        } catch (error) {
+            next(error);
+        }
+    };
+};
+
+// Replace route handlers with properly wrapped handlers
 router.get(
     '/',
-    asyncHandler(getInstitutionsHandler)
+    asyncHandlerWrapper(getInstitutionsHandlerWrapper)
 );
 
 router.get(
     '/can-link',
-    asyncHandler(canLinkAccountHandler)
+    asyncHandlerWrapper(canLinkAccountHandlerWrapper)
 );
 
 router.delete(
     '/:institutionId',
-    asyncHandler(deleteInstitutionHandler)
+    asyncHandlerWrapper(deleteInstitutionHandlerWrapper)
 );
 
 router.post(
     '/:institutionId/refresh',
-    asyncHandler(refreshInstitutionHandler)
+    asyncHandlerWrapper(refreshInstitutionHandlerWrapper)
 );
 
 export default router;

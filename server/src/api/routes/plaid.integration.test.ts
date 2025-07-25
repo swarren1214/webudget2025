@@ -1,7 +1,7 @@
 // src/api/routes/plaid.integration.test.ts
 
 import request from 'supertest';
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction, RequestHandler } from 'express';
 import { sign } from 'jsonwebtoken';
 import { mocked } from 'jest-mock';
 import { ItemGetResponse, ItemPublicTokenExchangeResponse, InstitutionsGetByIdResponse } from 'plaid';
@@ -26,15 +26,20 @@ describe('Plaid Integration Tests: POST /api/v1/plaid/exchange-public-token', ()
         app = express();
         app.use(express.json());
 
-        app.use((req: Request, res: Response, next: NextFunction) => {
-            req.log = {
-                info: jest.fn(), warn: jest.fn(), error: jest.fn(),
-                debug: jest.fn(), fatal: jest.fn(), trace: jest.fn(),
-                child: jest.fn(),
-            } as any;
-            req.id = 'test-request-id';
+        // Adjust middleware to ensure compatibility with typings
+        app.use(((req: Request, res: Response, next: NextFunction) => {
+            req.log = req.log ?? {
+                info: jest.fn() as jest.Mock<any, any>,
+                warn: jest.fn() as jest.Mock<any, any>,
+                error: jest.fn() as jest.Mock<any, any>,
+                debug: jest.fn() as jest.Mock<any, any>,
+                fatal: jest.fn() as jest.Mock<any, any>,
+                trace: jest.fn() as jest.Mock<any, any>,
+                child: jest.fn() as jest.Mock<any, any>,
+            };
+            req.id = req.id ?? 'test-request-id';
             next();
-        });
+        }) as unknown as RequestHandler);
 
         app.use(mainRouter);
         app.use(errorHandler);

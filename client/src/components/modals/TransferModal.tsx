@@ -86,7 +86,7 @@ const TransferModal = ({ isOpen, onClose, accounts }: TransferModalProps) => {
       });
       onClose();
       queryClient.invalidateQueries({ queryKey: ['/api/transfers'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['/accounts'] });
     },
     onError: () => {
       toast({

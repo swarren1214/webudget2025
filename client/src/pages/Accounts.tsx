@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -7,18 +7,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ConnectAccountModal from "@/components/modals/ConnectAccountModal";
 import { type Account, type InsertAccount } from "@shared/schema";
 import { Plus } from "lucide-react";
-import { createAccount } from "@/lib/api";
+import { createAccount, createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { usePlaidLink } from "react-plaid-link";
 
 function Accounts() {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   // Fetch accounts data
   const { data: accounts, isLoading } = useQuery<Account[]>({
-    queryKey: ['/api/accounts'],
+    queryKey: ['/accounts'],
   });
   
   // Create account mutation
@@ -39,18 +41,46 @@ function Accounts() {
     }
   });
   
-  const handleConnectAccount = async () => {
-    // Create a new account first
-    createAccountMutation.mutate({
-      userId: 1, // In a real app, this would come from the user's session
-      name: "New Account",
-      type: "checking",
-      balance: 0,
-      accountNumber: "****1234",
-      institutionName: "Unknown Bank",
-      institutionLogo: "",
-      isConnected: false
-    });
+  useEffect(() => {
+    const fetchLinkToken = async () => {
+      try {
+        const { linkToken } = await createPlaidLinkToken();
+        setLinkToken(linkToken);
+      } catch (error) {
+        console.error("Failed to fetch Plaid Link token from backend API:", error);
+      }
+    };
+
+    fetchLinkToken();
+  }, []);
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken || "",
+    onSuccess: async (publicToken) => {
+      try {
+        if (selectedAccountId === null) {
+          throw new Error("No account selected.");
+        }
+        await exchangePlaidPublicToken(publicToken, selectedAccountId);
+        toast({
+          title: "Success",
+          description: "Account successfully connected.",
+          variant: "default",
+        });
+        queryClient.invalidateQueries({ queryKey: ['/accounts'] });
+      } catch (error) {
+        console.error("Failed to exchange Plaid public token:", error);
+        toast({
+          title: "Error",
+          description: "Failed to connect account. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const handleConnectAccount = () => {
+    if (ready) open();
   };
   
   return (
