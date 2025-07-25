@@ -8,6 +8,7 @@
       "@/*": ["src/*"],                      // Alias for client/src/*
       "@shared/*": ["../shared/*"]           // Alias for root-level /shared/*
     },
+    "typeRoots": ["./node_modules/@types", "./src/types"],        // Alias for root-level /shared/*
     "rootDir": "src",                        // Where source files live
     "outDir": "dist",                        // Output folder (typically unused for Vite dev)
     "jsx": "react-jsx",                      // React JSX transform

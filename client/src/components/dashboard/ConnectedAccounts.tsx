@@ -3,13 +3,39 @@ import { Button } from "@/components/ui/button";
 import { type Account } from "@shared/schema";
 import { Plus } from "lucide-react";
 import { Link } from "wouter";
+import { usePlaidLink } from "react-plaid-link";
+import { createPlaidLinkToken } from "@/lib/api";
+import { useEffect, useState } from "react";
 
 interface ConnectedAccountsProps {
   accounts: Account[];
-  onConnectAccount: () => void;
+  onConnectAccount: (publicToken: string) => void;
 }
 
 const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProps) => {
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLinkToken = async () => {
+      try {
+        const { linkToken } = await createPlaidLinkToken();
+        setLinkToken(linkToken);
+      } catch (error) {
+        console.error("Failed to fetch Plaid Link token:", error);
+      }
+    };
+
+    fetchLinkToken();
+  }, []);
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken || "",
+    onSuccess: (publicToken) => {
+      console.log("Plaid Link success, public token:", publicToken);
+      onConnectAccount(publicToken);
+    },
+  });
+
   const getIconForAccountType = (type: string) => {
     switch (type) {
       case 'checking':
@@ -40,7 +66,12 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-semibold">Connected Accounts</CardTitle>
-        <Button variant="link" size="sm" className="text-primary" onClick={onConnectAccount}>
+        <Button
+          variant="link"
+          size="sm"
+          className="text-primary"
+          onClick={() => ready && open()}
+        >
           + Add Account
         </Button>
       </CardHeader>
@@ -69,7 +100,7 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
           
           <div 
             className="p-3 border border-gray-200 rounded-lg flex items-center justify-between hover:bg-gray-50 cursor-pointer border-dashed"
-            onClick={onConnectAccount}
+            onClick={() => ready && open()}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center text-gray-400">

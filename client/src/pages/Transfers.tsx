@@ -19,7 +19,7 @@ function Transfers() {
   
   // Fetch accounts
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
-    queryKey: ['/api/accounts'],
+    queryKey: ['/accounts'],
   });
   
   // Function to get account name by ID

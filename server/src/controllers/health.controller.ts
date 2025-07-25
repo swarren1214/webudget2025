@@ -3,6 +3,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { checkHealth } from '../services/health.service';
 import { DependencyContainer } from '../config/dependencies';
+import { supabase } from '../config/supabaseClient';
 
 const container = DependencyContainer.getInstance();
 
@@ -14,9 +15,11 @@ export const getHealthStatus = async (
     try {
         // Create a check function that uses our repositories
         const checkDbConnection = async () => {
-            const repository = container.getPlaidItemRepository();
-            // Simple query to verify connection
-            await repository.findById(-1); // Won't find anything, but tests connection
+            const { error } = await supabase
+                .from('institutions')
+                .select('*')
+                .limit(1);
+            if (error) throw error;
         };
 
         const healthStatus = await checkHealth(checkDbConnection);

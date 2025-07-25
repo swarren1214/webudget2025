@@ -19,17 +19,17 @@ function Dashboard() {
   
   // Fetch accounts data
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
-    queryKey: ['/api/accounts'],
+    queryKey: ['/accounts'],
   });
   
   // Fetch budget categories data
   const { data: budgetCategories, isLoading: isLoadingBudgets } = useQuery<BudgetCategory[]>({
-    queryKey: ['/api/budget-categories'],
+    queryKey: ['/budget-categories'],
   });
   
   // Fetch recent transactions
   const { data: recentTransactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ['/api/transactions/recent'],
+    queryKey: ['/transactions/recent'],
   });
   
   // Calculate total balance

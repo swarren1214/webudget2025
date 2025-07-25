@@ -1,10 +1,11 @@
 // server/src/api/routes/connectivity.test.ts
 
 import request from 'supertest';
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction, RequestHandler } from 'express';
 import cors from 'cors';
 import mainRouter from './index';
 import { errorHandler } from '../../middleware/error.middleware';
+import { Logger } from 'pino';
 
 describe('Backend Connectivity Tests', () => {
     let app: Express;
@@ -13,15 +14,19 @@ describe('Backend Connectivity Tests', () => {
         app = express();
         
         // Add minimal middleware for testing
-        app.use((req: Request, res: Response, next: NextFunction) => {
-            req.log = {
-                info: jest.fn(), warn: jest.fn(), error: jest.fn(),
-                debug: jest.fn(), fatal: jest.fn(), trace: jest.fn(),
-                child: jest.fn(),
-            } as any;
-            req.id = 'test-request-id';
+        app.use(((req: Request, res: Response, next: NextFunction) => {
+            req.log = req.log ?? {
+                info: jest.fn() as jest.Mock<any, any>,
+                warn: jest.fn() as jest.Mock<any, any>,
+                error: jest.fn() as jest.Mock<any, any>,
+                debug: jest.fn() as jest.Mock<any, any>,
+                fatal: jest.fn() as jest.Mock<any, any>,
+                trace: jest.fn() as jest.Mock<any, any>,
+                child: jest.fn() as jest.Mock<any, any>,
+            };
+            req.id = req.id ?? 'test-request-id';
             next();
-        });
+        }) as unknown as RequestHandler);
         
         // Configure CORS the same way as in the main app
         app.use(cors({
@@ -107,4 +112,4 @@ describe('Backend Connectivity Tests', () => {
             expect(response.body).toHaveProperty('timestamp');
         });
     });
-}); 
+});

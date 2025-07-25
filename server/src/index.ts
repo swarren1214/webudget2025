@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import mainRouter from './api/routes';
 import { errorHandler } from './middleware/error.middleware';
 import { ConfigurationError } from './utils/errors';
+import { supabase } from './config/supabaseClient';
 
 // Handle configuration errors gracefully
 process.on('uncaughtException', (error) => {
@@ -28,11 +29,24 @@ process.on('uncaughtException', (error) => {
 const app: Express = express();
 const port = config.PORT;
 
+// Test database connection endpoint
+app.get('/test-db', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('users').select('*').limit(1);
+    if (error) throw error;
+    res.status(200).json({ message: 'Database connection successful', data });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ message: 'Database connection failed', error: errorMessage });
+  }
+});
+
+// --- API Routes ---
 app.use(pinoHttp({
   logger,
   // Define a custom request ID header
   genReqId: function (req, res) {
-    const existingId = req.id ?? req.headers["x-request-id"];
+    const existingId = req.id ?? req.headers["x-request-id"] ?? 'unknown';
     if (existingId) return existingId;
     const id = randomUUID();
     res.setHeader('X-Request-Id', id);
@@ -89,6 +103,6 @@ app.use('/', mainRouter);
 app.use(errorHandler);
 
 // --- Start the Server ---
-app.listen(port, () => {
-  logger.info(`[server]: Server is running at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  logger.info(`[server]: Server is running at http://0.0.0.0:${port}`);
 });
