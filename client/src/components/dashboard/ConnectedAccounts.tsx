@@ -4,7 +4,7 @@ import { type Account } from "@shared/schema";
 import { Plus } from "lucide-react";
 import { Link } from "wouter";
 import { usePlaidLink } from "react-plaid-link";
-import { createPlaidLinkToken } from "@/lib/api";
+import { createPlaidLinkToken } from "@/lib/backendApi";
 import { useEffect, useState } from "react";
 
 interface ConnectedAccountsProps {
@@ -77,7 +77,7 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {accounts.map(account => (
+          {Array.isArray(accounts) ? accounts.map(account => (
             <div 
               key={account.id}
               className="p-3 border border-gray-200 rounded-lg flex items-center justify-between hover:bg-gray-50 cursor-pointer"
@@ -96,7 +96,9 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
                 {account.balance < 0 ? '-' : ''}${Math.abs(account.balance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
               </p>
             </div>
-          ))}
+          )) : (
+            <p>No accounts connected.</p>
+          )}
           
           <div 
             className="p-3 border border-gray-200 rounded-lg flex items-center justify-between hover:bg-gray-50 cursor-pointer border-dashed"

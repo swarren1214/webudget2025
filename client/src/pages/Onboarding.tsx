@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
-import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/api';
+import { createPlaidLinkToken, exchangePlaidPublicToken } from '@/lib/backendApi';
 import { supabase } from '@/lib/supabaseClient';
 import { errorLog } from '@/lib/utils';
 import { PlaidErrorBoundary, usePlaidErrorHandler } from '@/components/PlaidErrorBoundary';
 import { useLocation } from 'wouter';
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const OnboardingPage: React.FC = () => {
   const [, navigate] = useLocation();
@@ -223,4 +224,11 @@ const OnboardingPage: React.FC = () => {
   );
 };
 
-export default OnboardingPage;
+// Wrap the OnboardingPage component with ErrorBoundary
+export default function OnboardingPageWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <OnboardingPage />
+    </ErrorBoundary>
+  );
+}

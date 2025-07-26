@@ -10,7 +10,7 @@ interface RecentTransactionsProps {
 
 const RecentTransactions = ({ transactions }: RecentTransactionsProps) => {
   // Group transactions by date
-  const groupedTransactions = transactions.reduce<Record<string, Transaction[]>>((groups, transaction) => {
+  const groupedTransactions = Array.isArray(transactions) ? transactions.reduce<Record<string, Transaction[]>>((groups, transaction) => {
     const date = new Date(transaction.date);
     const today = new Date();
     const yesterday = new Date();
@@ -34,45 +34,33 @@ const RecentTransactions = ({ transactions }: RecentTransactionsProps) => {
     }
     groups[dateLabel].push(transaction);
     return groups;
-  }, {});
+  }, {}) : {};
   
   // Function to get transaction icon based on category
-  const getTransactionIcon = (category?: string) => {
-    if (!category) return 'receipt_long';
+  const getTransactionIcon = (category?: string | null) => {
+    if (!category) return 'help_outline';
     
-    switch (category) {
-      case 'Groceries':
-        return 'shopping_cart';
-      case 'Dining Out':
+    switch (category.toLowerCase()) {
+      case 'food':
         return 'restaurant';
-      case 'Transportation':
-        return 'local_taxi';
-      case 'Entertainment':
-        return 'movie';
-      case 'Income':
-        return 'attach_money';
+      case 'transport':
+        return 'directions_car';
       default:
-        return 'receipt_long';
+        return 'help_outline';
     }
   };
   
   // Function to get transaction icon color based on category
-  const getTransactionIconColor = (category?: string) => {
-    if (!category) return 'bg-gray-100 text-gray-500';
+  const getTransactionIconColor = (category?: string | null) => {
+    if (!category) return 'bg-gray-200';
     
-    switch (category) {
-      case 'Groceries':
-        return 'bg-blue-100 text-blue-500';
-      case 'Dining Out':
-        return 'bg-yellow-100 text-yellow-500';
-      case 'Transportation':
-        return 'bg-purple-100 text-purple-500';
-      case 'Entertainment':
-        return 'bg-red-100 text-red-500';
-      case 'Income':
-        return 'bg-green-100 text-green-500';
+    switch (category.toLowerCase()) {
+      case 'food':
+        return 'bg-red-200';
+      case 'transport':
+        return 'bg-blue-200';
       default:
-        return 'bg-gray-100 text-gray-500';
+        return 'bg-gray-200';
     }
   };
   

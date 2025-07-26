@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import TransferModal from "@/components/modals/TransferModal";
 import { type Transfer, type Account } from "@shared/schema";
 import { ArrowRight, Plus } from "lucide-react";
+import { apiFetch } from '../utils/apiFetch';
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Transfers() {
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -15,11 +17,19 @@ function Transfers() {
   // Fetch transfers
   const { data: transfers, isLoading: isLoadingTransfers } = useQuery<Transfer[]>({
     queryKey: ['/api/transfers'],
+    queryFn: async () => {
+      const res = await apiFetch('/api/transfers');
+      return res.json();
+    }
   });
   
   // Fetch accounts
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
     queryKey: ['/accounts'],
+    queryFn: async () => {
+      const res = await apiFetch('/accounts');
+      return res.json();
+    }
   });
   
   // Function to get account name by ID
@@ -28,12 +38,12 @@ function Transfers() {
   };
   
   // Function to format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (date: string | Date) => {
+    const parsedDate = typeof date === 'string' ? new Date(date) : date;
+    return parsedDate.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
   
@@ -129,4 +139,11 @@ function Transfers() {
   );
 }
 
-export default Transfers;
+// Wrap the Transfers component with ErrorBoundary
+export default function TransfersWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <Transfers />
+    </ErrorBoundary>
+  );
+}

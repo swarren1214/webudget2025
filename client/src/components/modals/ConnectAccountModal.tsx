@@ -14,7 +14,7 @@ import { Search, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/api";
+import { createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/backendApi";
 
 interface ConnectAccountModalProps {
   isOpen: boolean;

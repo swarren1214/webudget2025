@@ -49,6 +49,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import NewBudgetWizardModal from "@/components/modals/NewBudgetWizardModal";
+import { apiFetch } from '../utils/apiFetch';
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const budgetFormSchema = z.object({
   name: z.string().min(1, "Category name is required"),
@@ -66,12 +68,20 @@ function Budgets() {
   
   // Fetch budget categories
   const { data: budgetCategories, isLoading: isLoadingBudgets } = useQuery<BudgetCategory[]>({
-    queryKey: ['/api/budget-categories'],
+    queryKey: ['/budget-categories'],
+    queryFn: async () => {
+      const res = await apiFetch('/budget-categories');
+      return res.json();
+    }
   });
   
   // Fetch transactions
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ['/api/transactions'],
+    queryKey: ['/transactions'],
+    queryFn: async () => {
+      const res = await apiFetch('/transactions');
+      return res.json();
+    }
   });
   
   // Calculate spending by category
@@ -322,4 +332,11 @@ function Budgets() {
   );
 }
 
-export default Budgets;
+// Wrap the Budgets component with ErrorBoundary
+export default function BudgetsWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <Budgets />
+    </ErrorBoundary>
+  );
+}

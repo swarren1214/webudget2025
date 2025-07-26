@@ -7,9 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ConnectAccountModal from "@/components/modals/ConnectAccountModal";
 import { type Account, type InsertAccount } from "@shared/schema";
 import { Plus } from "lucide-react";
-import { createAccount, createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/api";
+import { createAccount, createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/backendApi";
 import { useToast } from "@/hooks/use-toast";
 import { usePlaidLink } from "react-plaid-link";
+import { apiFetch } from '../utils/apiFetch';
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Accounts() {
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -19,10 +21,23 @@ function Accounts() {
   const queryClient = useQueryClient();
   
   // Fetch accounts data
-  const { data: accounts, isLoading } = useQuery<Account[]>({
+  const { data: accounts, isLoading } = useQuery({
     queryKey: ['/accounts'],
+    queryFn: async () => {
+      const res = await apiFetch('/accounts');
+      return res.json();
+    }
   });
-  
+
+  // Fetch transactions data
+  const { data: transactions } = useQuery({
+    queryKey: ['transactions'],
+    queryFn: async () => {
+      const res = await apiFetch('/transactions');
+      return res.json();
+    }
+  });
+
   // Create account mutation
   const createAccountMutation = useMutation({
     mutationFn: async (accountData: InsertAccount) => {
@@ -101,7 +116,7 @@ function Accounts() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {accounts?.map((account) => (
+          {accounts?.map((account: Account) => (
             <AccountCard key={account.id} account={account} />
           ))}
           
@@ -196,4 +211,11 @@ function AccountCard({ account }: AccountCardProps) {
   );
 }
 
-export default Accounts;
+// Wrap the Accounts component with ErrorBoundary
+export default function AccountsWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <Accounts />
+    </ErrorBoundary>
+  );
+}

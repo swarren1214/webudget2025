@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "lucide-react";
-import { updateTransaction } from "@/lib/api";
+import { updateTransaction } from "@/lib/supabaseApi";
 import { FaRegFolderOpen, FaShoppingCart, FaUtensils, FaCar, FaHome, FaPiggyBank, FaBolt, FaRegSmile, FaRegMoneyBillAlt, FaRegHeart, FaRegStar, FaRegSun, FaRegMoon, FaRegLightbulb, FaRegGem, FaRegBell, FaRegCalendarAlt, FaRegClock, FaRegCreditCard, FaRegListAlt, FaRegChartBar, FaRegEnvelope, FaRegFileAlt, FaRegUser, FaRegThumbsUp, FaRegThumbsDown, FaRegCheckCircle, FaRegTimesCircle } from "react-icons/fa";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -90,11 +90,11 @@ export default function TransactionDetailsModal({ open, onOpenChange, transactio
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await updateTransaction(transaction.id, {
+      const validTransactionData = {
+        ...transaction,
         category: selectedBudget,
-        notes,
-        futureCategory,
-      });
+      };
+      await updateTransaction(transaction.id, validTransactionData);
       setInitialState({ category: selectedBudget, notes, futureCategory });
       // Optionally close modal or show success
     } finally {
@@ -198,4 +198,4 @@ export default function TransactionDetailsModal({ open, onOpenChange, transactio
       </DialogContent>
     </Dialog>
   );
-} 
+}
