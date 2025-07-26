@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useLocation } from 'wouter';
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const SignUpPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -203,4 +204,11 @@ const SignUpPage: React.FC = () => {
   );
 };
 
-export default SignUpPage;
+// Wrap the SignUpPage component with ErrorBoundary
+export default function SignUpPageWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <SignUpPage />
+    </ErrorBoundary>
+  );
+}

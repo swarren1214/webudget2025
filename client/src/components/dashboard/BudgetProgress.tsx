@@ -11,7 +11,7 @@ interface BudgetProgressProps {
 
 const BudgetProgress = ({ categories, transactions }: BudgetProgressProps) => {
   // Calculate spending for each category
-  const categoriesWithSpending = categories.map(category => {
+  const categoriesWithSpending = Array.isArray(categories) ? categories.map(category => {
     const spent = transactions
       .filter(t => !t.isIncome && t.category === category.name)
       .reduce((sum, t) => sum + t.amount, 0);
@@ -23,7 +23,7 @@ const BudgetProgress = ({ categories, transactions }: BudgetProgressProps) => {
       spent,
       percentage
     };
-  });
+  }) : [];
   
   return (
     <Card>

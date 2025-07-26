@@ -10,7 +10,9 @@ import { Search, Filter } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConnectAccountModal from "@/components/modals/ConnectAccountModal";
 import TransferModal from "@/components/modals/TransferModal";
+import { apiFetch } from '../utils/apiFetch';
 import { type Account, type BudgetCategory, type Transaction } from "@shared/schema";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Dashboard() {
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -18,34 +20,53 @@ function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   
   // Fetch accounts data
-  const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
+  const { data: accounts, isLoading: isLoadingAccounts, error: accountsError } = useQuery<Account[]>({
     queryKey: ['/accounts'],
+    queryFn: async () => {
+      const res = await apiFetch('/accounts');
+      return res.json();
+    }
   });
+  
+  if (accountsError) {
+    console.error('Error fetching accounts:', accountsError);
+  }
   
   // Fetch budget categories data
-  const { data: budgetCategories, isLoading: isLoadingBudgets } = useQuery<BudgetCategory[]>({
+  const { data: budgetCategories, isLoading: isLoadingBudgets, error: budgetsError } = useQuery<BudgetCategory[]>({
     queryKey: ['/budget-categories'],
+    queryFn: async () => {
+      const res = await apiFetch('/budget-categories');
+      return res.json();
+    }
   });
+  
+  if (budgetsError) {
+    console.error('Error fetching budget categories:', budgetsError);
+  }
   
   // Fetch recent transactions
-  const { data: recentTransactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
+  const { data: recentTransactions, isLoading: isLoadingTransactions, error: transactionsError } = useQuery<Transaction[]>({
     queryKey: ['/transactions/recent'],
+    queryFn: async () => {
+      const res = await apiFetch('/transactions/recent');
+      return res.json();
+    }
   });
   
+  if (transactionsError) {
+    console.error('Error fetching recent transactions:', transactionsError);
+  }
+  
   // Calculate total balance
-  const totalBalance = accounts?.reduce((sum, account) => sum + account.balance, 0) || 0;
+  const totalBalance = Array.isArray(accounts) ? accounts.reduce((sum, account) => sum + account.balance, 0) : 0;
   
   // Calculate monthly income and expenses
   const thisMonth = new Date();
   thisMonth.setDate(1);
   
-  const monthlyIncome = recentTransactions
-    ?.filter(t => t.isIncome && new Date(t.date) >= thisMonth)
-    .reduce((sum, t) => sum + t.amount, 0) || 0;
-  
-  const monthlyExpenses = recentTransactions
-    ?.filter(t => !t.isIncome && new Date(t.date) >= thisMonth)
-    .reduce((sum, t) => sum + t.amount, 0) || 0;
+  const monthlyIncome = Array.isArray(recentTransactions) ? recentTransactions.filter(t => t.isIncome && new Date(t.date) >= thisMonth).reduce((sum, t) => sum + t.amount, 0) : 0;
+  const monthlyExpenses = Array.isArray(recentTransactions) ? recentTransactions.filter(t => !t.isIncome && new Date(t.date) >= thisMonth).reduce((sum, t) => sum + t.amount, 0) : 0;
   
   return (
     <>
@@ -160,4 +181,11 @@ function Dashboard() {
   );
 }
 
-export default Dashboard;
+// Wrap the Dashboard component with ErrorBoundary
+export default function DashboardWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <Dashboard />
+    </ErrorBoundary>
+  );
+}

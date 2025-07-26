@@ -51,5 +51,8 @@
   "docker.composeCommand": "docker compose",
   "docker.enableDockerComposeLanguageService": true,
   "containers.composeCommand": "docker compose",
-  "containers.enableComposeLanguageService": true
+  "containers.enableComposeLanguageService": true,
+  "cSpell.words": [
+    "Uncategorized"
+  ]
 }

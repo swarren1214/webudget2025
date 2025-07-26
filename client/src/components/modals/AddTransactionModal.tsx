@@ -14,11 +14,19 @@ import { Calendar } from "lucide-react";
 interface AddTransactionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSave: (transaction: {
+    description: string;
+    amount: number;
+    date: string;
+    accountId: number;
+    category: string;
+    isIncome: boolean;
+  }) => void;
   accounts: { id: number; name: string }[];
   categories: string[];
 }
 
-export default function AddTransactionModal({ open, onOpenChange, accounts, categories }: AddTransactionModalProps) {
+export default function AddTransactionModal({ open, onOpenChange, onSave, accounts, categories }: AddTransactionModalProps) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -28,7 +36,15 @@ export default function AddTransactionModal({ open, onOpenChange, accounts, cate
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Placeholder: wire up to API
+    const transaction = {
+      description,
+      amount: parseFloat(amount),
+      date,
+      accountId: parseInt(accountId, 10),
+      category,
+      isIncome,
+    };
+    onSave(transaction);
     onOpenChange(false);
   };
 
@@ -111,4 +127,4 @@ export default function AddTransactionModal({ open, onOpenChange, accounts, cate
       </DialogContent>
     </Dialog>
   );
-} 
+}

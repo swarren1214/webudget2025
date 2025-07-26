@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/select";
 import { type Transaction, type Account } from "@shared/schema";
 import { Calendar, Search, Filter, RefreshCw, Plus } from "lucide-react";
-import { syncTransactions, getBudgetCategories } from "@/lib/api";
+import { syncTransactions, getBudgetCategories } from "@/lib/backendApi";
 import { useToast } from "@/hooks/use-toast";
 import AddTransactionModal from "@/components/modals/AddTransactionModal";
 import TransactionDetailsModal from "@/components/modals/TransactionDetailsModal";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Transactions() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,7 +40,7 @@ function Transactions() {
   });
   
   // Fetch budget categories
-  const { data: budgetCategories, isLoading: isLoadingBudgets, error: budgetCategoriesError } = useQuery({
+  const { data: budgetCategories = [], isLoading: isLoadingBudgets, error: budgetCategoriesError } = useQuery<Array<{ name: string; color: string }>>({
     queryKey: ['/budget-categories'],
     queryFn: getBudgetCategories,
   });
@@ -63,6 +64,40 @@ function Transactions() {
         variant: "destructive",
       });
     }
+  });
+  
+  // Add mutation for adding a transaction
+  const addTransactionMutation = useMutation({
+    mutationFn: async (newTransaction: Partial<Transaction>) => {
+      const response = await fetch('/api/v1/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTransaction),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add transaction');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Transaction added successfully',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/transactions'] });
+      setShowAddTransactionModal(false);
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to add transaction. Please try again.',
+        variant: 'destructive',
+      });
+    },
   });
   
   // Get unique categories from transactions
@@ -121,6 +156,12 @@ function Transactions() {
     );
   }
   
+  const accountOptions = Array.isArray(accounts) ? accounts.map(account => (
+    <SelectItem key={account.id} value={account.id.toString()}>
+      {account.name}
+    </SelectItem>
+  )) : [];
+  
   return (
     <>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -143,11 +184,7 @@ function Transactions() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Accounts</SelectItem>
-            {accounts?.map(account => (
-              <SelectItem key={account.id} value={account.id.toString()}>
-                {account.name}
-              </SelectItem>
-            ))}
+            {accountOptions}
           </SelectContent>
         </Select>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -191,7 +228,13 @@ function Transactions() {
         budgets={budgetCategories ? budgetCategories.map(b => ({ name: b.name, color: b.color, icon: 'default-icon' })) : []}
       />
       
-      <AddTransactionModal open={showAddTransactionModal} onOpenChange={setShowAddTransactionModal} accounts={accounts || []} categories={categories} />
+      <AddTransactionModal 
+        open={showAddTransactionModal} 
+        onOpenChange={setShowAddTransactionModal} 
+        accounts={accounts || []} 
+        categories={categories} 
+        onSave={(transaction) => addTransactionMutation.mutate({ ...transaction, date: new Date(transaction.date) })} 
+      />
       
       {(isLoadingTransactions || isLoadingAccounts || isLoadingBudgets) ? (
         <div className="space-y-4">
@@ -278,4 +321,11 @@ function Transactions() {
   );
 }
 
-export default Transactions;
+// Wrap the Transactions component with ErrorBoundary
+export default function TransactionsWithBoundary() {
+  return (
+    <ErrorBoundary>
+      <Transactions />
+    </ErrorBoundary>
+  );
+}

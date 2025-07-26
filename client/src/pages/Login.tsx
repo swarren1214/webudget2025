@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useLocation } from 'wouter';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const providers = [
 	{
@@ -156,4 +157,11 @@ const LoginPage: React.FC = () => {
 	);
 };
 
-export default LoginPage;
+// Wrap the LoginPage component with ErrorBoundary
+export default function LoginPageWithBoundary() {
+	return (
+		<ErrorBoundary>
+			<LoginPage />
+		</ErrorBoundary>
+	);
+}
