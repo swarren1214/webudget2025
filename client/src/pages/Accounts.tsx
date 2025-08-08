@@ -6,11 +6,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConnectAccountModal from "@/components/modals/ConnectAccountModal";
 import { type Account, type InsertAccount } from "@shared/schema";
-import { Plus } from "lucide-react";
+import { HiPlus } from "react-icons/hi";
 import { createAccount, createPlaidLinkToken, exchangePlaidPublicToken } from "@/lib/backendApi";
 import { useToast } from "@/hooks/use-toast";
 import { usePlaidLink } from "react-plaid-link";
-import { apiFetch } from '../utils/apiFetch';
+import { apiFetch } from '@/lib/backendApi';
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Accounts() {
@@ -102,8 +102,11 @@ function Accounts() {
     <>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Accounts</h1>
-        <Button onClick={handleConnectAccount}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button 
+          onClick={handleConnectAccount}
+          icon={<HiPlus />}
+          iconPosition="left"
+        >
           Connect Account
         </Button>
       </div>
@@ -125,7 +128,7 @@ function Accounts() {
             className="border-dashed h-[100px] mt-2"
             onClick={handleConnectAccount}
           >
-            <Plus className="mr-2 h-5 w-5" />
+            <HiPlus className="mr-2 h-5 w-5" />
             Connect New Account
           </Button>
         </div>

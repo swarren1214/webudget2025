@@ -7,8 +7,8 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import TransferModal from "@/components/modals/TransferModal";
 import { type Transfer, type Account } from "@shared/schema";
-import { ArrowRight, Plus } from "lucide-react";
-import { apiFetch } from '../utils/apiFetch';
+import { HiArrowRight, HiPlus } from "react-icons/hi";
+import { apiFetch } from '@/lib/backendApi';
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 function Transfers() {
@@ -65,12 +65,14 @@ function Transfers() {
     <>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Transfers</h1>
-        <Button onClick={() => setShowTransferModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button 
+          onClick={() => setShowTransferModal(true)}
+          icon={<HiPlus />}
+          iconPosition="left"
+        >
           New Transfer
         </Button>
       </div>
-      
       <Card>
         <CardHeader>
           <CardTitle>Transfer History</CardTitle>
@@ -89,7 +91,7 @@ function Transfers() {
                       </div>
                       <div>
                         <h3 className="font-medium">
-                          {getAccountName(transfer.fromAccountId)} <ArrowRight className="inline h-4 w-4 mx-1" /> {getAccountName(transfer.toAccountId)}
+                          {getAccountName(transfer.fromAccountId)} <HiArrowRight className="inline h-4 w-4 mx-1" /> {getAccountName(transfer.toAccountId)}
                         </h3>
                         <p className="text-sm text-muted-foreground">{formatDate(transfer.date)}</p>
                       </div>

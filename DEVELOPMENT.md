@@ -39,8 +39,8 @@ npm run dev:docker:down
 
 ### Individual Services
 ```bash
-# Start only backend services (API + Database)
-docker compose -f docker-compose.dev.yml up -d db api
+# Start only backend services (API)
+docker compose -f docker-compose.dev.yml up -d api
 
 # Start only frontend (native)
 cd client && npm run dev
@@ -61,9 +61,6 @@ curl http://localhost:3000/health
 ```bash
 # API logs
 docker compose -f docker-compose.dev.yml logs -f api
-
-# Database logs
-docker compose -f docker-compose.dev.yml logs -f db
 ```
 
 ## 📱 Access Points
@@ -73,7 +70,7 @@ docker compose -f docker-compose.dev.yml logs -f db
 | Frontend | http://localhost:5173 | Main application |
 | Backend API | http://localhost:3000 | REST API |
 | API Health | http://localhost:3000/health | Health check |
-| Database | localhost:5432 | PostgreSQL |
+| Supabase | https://app.supabase.io | Database |
 
 ## 🛠️ Common Tasks
 
@@ -82,8 +79,8 @@ docker compose -f docker-compose.dev.yml logs -f db
 # Run migrations
 docker compose -f docker-compose.dev.yml run --rm api npm run migrate:up
 
-# Connect to database
-docker compose -f docker-compose.dev.yml exec db psql -U myuser -d webudget_db
+# Connect to Supabase
+# Use the Supabase dashboard or a PostgreSQL client with the connection string provided in your .env file
 ```
 
 ### Clean Reset
@@ -95,4 +92,4 @@ npm run dev:docker
 
 ---
 
-**Need help?** Run the setup script again or check the full documentation in `docs/` directory. 
+**Need help?** Run the setup script again or check the full documentation in `docs/` directory.

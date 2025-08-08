@@ -26,11 +26,11 @@ const BudgetProgress = ({ categories, transactions }: BudgetProgressProps) => {
   }) : [];
   
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="mb-6">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-lg font-semibold">Budget Progress</CardTitle>
         <Link href="/budgets">
-          <Button variant="link" size="sm" className="text-primary">
+          <Button variant="ghost" size="sm" className="text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
             View All
           </Button>
         </Link>

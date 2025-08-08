@@ -3,11 +3,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu, Bell, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { type User } from "@shared/schema";
+// Define User type locally since it's not exported from @shared/schema
 import { Navbar, DarkThemeToggle, Dropdown } from "flowbite-react";
 import { useState } from "react";
 import { LoginButton, LogoutButton } from "@/components/ui/AuthButtons";
 import ProfileModal from "@/components/modals/ProfileModal";
+
+// Define User type locally since it's not exported from @shared/schema
+type User = {
+  id: string;
+  email: string;
+  fullName: string;
+};
+
+interface HeaderProps {
+  onMenuClick: () => void;
+}
 import { supabase } from "@/lib/supabaseClient";
 
 interface HeaderProps {

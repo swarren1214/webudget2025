@@ -1,5 +1,4 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 
 interface SummaryCardProps {
   title: string;
@@ -9,36 +8,38 @@ interface SummaryCardProps {
   changeText: string;
   icon: string;
   iconColor: string;
+  className?: string; // Custom class for the Card
+  titleClassName?: string; // Custom class for the title
+  amountClassName?: string; // Custom class for the amount
+  changeClassName?: string; // Custom class for the change text
+  iconClassName?: string; // Custom class for the icon
 }
 
-const SummaryCard = ({ 
-  title, 
-  amount, 
-  change, 
-  changePercent, 
-  changeText, 
-  icon, 
-  iconColor 
+const SummaryCard = ({
+  title,
+  amount,
+  change,
+  icon,
+  iconColor,
+  className, // Custom class for the Card
+  titleClassName, // Custom class for the title
+  amountClassName, // Custom class for the amount
+  changeClassName, // Custom class for the change text
+  iconClassName, // Custom class for the icon
 }: SummaryCardProps) => {
-  const isPositive = change >= 0;
-  
+
   return (
-    <Card>
+    <Card className={className}> {/* Apply custom className */}
       <CardContent className="pt-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-gray-500 font-medium">{title}</h3>
-          <span className={`material-icons ${iconColor}`}>{icon}</span>
+          <h3 className={`text-gray-500 font-medium ${titleClassName}`}>{title}</h3> {/* Apply titleClassName */}
+          <span className={`material-icons ${iconColor} ${iconClassName}`}>{icon}</span> {/* Apply iconClassName */}
         </div>
-        <p className="text-3xl font-bold tabular-nums">
-          ${Math.abs(amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-        </p>
-        <p className={`text-sm ${isPositive ? 'text-green-500' : 'text-red-500'} flex items-center mt-1`}>
-          {isPositive ? (
-            <ArrowUpIcon className="mr-1 h-4 w-4" />
-          ) : (
-            <ArrowDownIcon className="mr-1 h-4 w-4" />
-          )}
-          {isPositive ? '+' : '-'}${Math.abs(change).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} ({Math.abs(changePercent)}%) {changeText}
+        <p className={`text-3xl font-bold tabular-nums ${amountClassName}`}> {/* Apply amountClassName */}
+          ${Math.abs(amount).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </p>
       </CardContent>
     </Card>

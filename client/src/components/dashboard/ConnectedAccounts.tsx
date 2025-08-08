@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { type Account } from "@shared/schema";
-import { Plus } from "lucide-react";
+import { HiPlus } from "react-icons/hi";
 import { Link } from "wouter";
 import { usePlaidLink } from "react-plaid-link";
 import { createPlaidLinkToken } from "@/lib/backendApi";
@@ -67,12 +67,12 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-semibold">Connected Accounts</CardTitle>
         <Button
-          variant="link"
+          variant="secondary"
           size="sm"
-          className="text-primary"
           onClick={() => ready && open()}
         >
-          + Add Account
+          <HiPlus className="h-4 w-4" />
+          Add Account
         </Button>
       </CardHeader>
       <CardContent>
@@ -106,7 +106,7 @@ const ConnectedAccounts = ({ accounts, onConnectAccount }: ConnectedAccountsProp
           >
             <div className="flex items-center">
               <div className="w-10 h-10 rounded-md bg-gray-100 flex items-center justify-center text-gray-400">
-                <Plus className="h-5 w-5" />
+                <HiPlus className="h-5 w-5" />
               </div>
               <div className="ml-3">
                 <p className="font-medium text-primary">Connect New Account</p>

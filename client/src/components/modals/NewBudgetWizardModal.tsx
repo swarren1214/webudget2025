@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, ChevronLeft, ChevronRight, Sparkles, CheckCircle2 } from "lucide-react";
+import { HiCheck, HiChevronLeft, HiChevronRight, HiSparkles, HiCheckCircle } from "react-icons/hi";
 import { FaUtensils, FaCar, FaHome, FaShoppingCart, FaPiggyBank, FaBolt, FaRegSmile, FaRegMoneyBillAlt, FaRegHeart, FaRegStar, FaRegSun, FaRegMoon, FaRegLightbulb, FaRegGem, FaRegBell, FaRegCalendarAlt, FaRegClock, FaRegCreditCard, FaRegListAlt, FaRegChartBar, FaRegEnvelope, FaRegFileAlt, FaRegFolderOpen, FaRegUser, FaRegThumbsUp, FaRegThumbsDown, FaRegCheckCircle, FaRegTimesCircle } from "react-icons/fa";
 
 const ICONS = [
@@ -44,22 +44,11 @@ const ICONS = [
   { name: "Times", icon: FaRegTimesCircle },
 ];
 
-const COLOR_PRESETS = [
-  { hex: "#10B981", name: "Emerald" },
-  { hex: "#3B82F6", name: "Blue" },
-  { hex: "#F59E0B", name: "Amber" },
-  { hex: "#EF4444", name: "Red" },
-  { hex: "#9333EA", name: "Purple" },
-  { hex: "#F472B6", name: "Pink" },
-  { hex: "#FBBF24", name: "Yellow" },
-  { hex: "#6366F1", name: "Indigo" },
-];
-
 const RECUR_OPTIONS = [
-  { label: "No Recurrence", value: "none", icon: <CheckCircle2 className="w-5 h-5 mr-2 text-muted-foreground" /> },
+  { label: "No Recurrence", value: "none", icon: <HiCheckCircle className="w-5 h-5 mr-2 text-muted-foreground" /> },
   { label: "Weekly", value: "weekly", icon: <FaRegCalendarAlt className="w-5 h-5 mr-2 text-blue-500" /> },
   { label: "Monthly", value: "monthly", icon: <FaRegCalendarAlt className="w-5 h-5 mr-2 text-purple-500" /> },
-  { label: "Custom", value: "custom", icon: <Sparkles className="w-5 h-5 mr-2 text-yellow-500" /> },
+  { label: "Custom", value: "custom", icon: <HiSparkles className="w-5 h-5 mr-2 text-yellow-500" /> },
 ];
 
 const steps = [
@@ -80,6 +69,17 @@ const stepLabels = [
   "Color",
   "Recurrence",
   "Done",
+];
+
+const COLOR_PRESETS = [
+  { hex: "#10B981", name: "Emerald" },
+  { hex: "#3B82F6", name: "Blue" },
+  { hex: "#F59E0B", name: "Amber" },
+  { hex: "#EF4444", name: "Red" },
+  { hex: "#9333EA", name: "Purple" },
+  { hex: "#F472B6", name: "Pink" },
+  { hex: "#FBBF24", name: "Yellow" },
+  { hex: "#6366F1", name: "Indigo" },
 ];
 
 interface NewBudgetWizardModalProps {
@@ -145,38 +145,43 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
 
   // Stepper
   const Stepper = () => (
-    <div className="w-full pt-8 pb-6 px-4">
+    <div className="w-full px-4">
       <div className="flex items-center justify-between mb-3">
         {stepLabels.slice(0, -1).map((label, i) => (
           <div key={label} className="flex-1 flex flex-col items-center">
-            <div className={`text-xs font-medium mb-1 ${i === step ? 'text-green-700' : 'text-gray-400'}`}>{label}</div>
-            <div className={`w-7 h-7 flex items-center justify-center rounded-full border-2 transition-all duration-300 ${i === step ? 'bg-green-500 border-green-500 text-white scale-110 shadow' : 'bg-white border-gray-300 text-gray-400'}`}>{i + 1}</div>
+            <div className={`text-xs font-medium mb-1 ${i === step ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400'}`}>{label}</div>
+            <div className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 ${i === step ? 'bg-gradient-to-r from-bigGrinch to-littleGrinch text-white scale-110 shadow' : 'bg-white border-gray-300 text-gray-400'}`}>{i + 1}</div>
           </div>
         ))}
       </div>
       <div className="relative h-1 w-full bg-gray-200 rounded-full">
-        <div className="absolute top-0 left-0 h-1 bg-green-500 rounded-full transition-all duration-300" style={{ width: `${(step / (steps.length - 2)) * 100}%` }} />
+        <div className="absolute top-0 left-0 h-1 bg-gradient-to-r from-bigGrinch to-littleGrinch rounded-full transition-all duration-300" style={{ width: `${(step / (steps.length - 2)) * 100}%` }} />
       </div>
     </div>
   );
 
   // Step container (no card, just modal styling)
   const StepContainer = ({ children }: { children: React.ReactNode }) => (
-    <div className="w-full max-w-md flex flex-col items-center justify-center px-2 sm:px-8 py-2 mx-auto min-h-[420px] animate-fade-in">
+    <div className="w-full flex flex-col items-center justify-center px-2 sm:px-8 py-2 mx-auto min-h-[420px] animate-fade-in">
       {children}
+      <div className="w-full flex flex-row gap-4 justify-center items-center mt-auto">
+        <Button variant="default" size="icon" icon={<HiChevronLeft />} onClick={handleBack}></Button>
+        <Stepper />
+        <Button variant="default" size="icon" icon={<HiChevronRight />} onClick={handleNext} disabled={!canNext()}></Button>
+      </div>
+      <div className="h-6" />
     </div>
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl rounded-2xl shadow-2xl border-0 bg-white p-0">
-        <Stepper />
+      <DialogContent className="max-w-xl rounded-2xl shadow-2xl border-0 bg-white dark:bg-gray-900 p-0">
         {/* Step 1: Inspirational message */}
         {step === 0 && (
           <StepContainer>
             <DialogHeader className="w-full text-center">
               <DialogTitle className="text-3xl font-extrabold mb-4 text-green-700 flex flex-col items-center justify-center gap-2">
-                <span className="inline-flex items-center justify-center"><Sparkles className="w-7 h-7 text-yellow-400 mr-2" />A journey of a thousand miles begins with one step...</span>
+                <span className="inline-flex items-center justify-center"><HiSparkles className="w-7 h-7 text-yellow-400 mr-2" />A journey of a thousand miles begins with one step...</span>
               </DialogTitle>
               <DialogDescription className="mb-8 text-lg text-gray-600">
                 We're here to take that step with you toward a better financial future.
@@ -218,8 +223,8 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
               className="w-full max-w-lg mx-auto mb-12 text-lg py-3 px-4 border-2 border-gray-200 rounded-lg focus:border-green-400 focus:ring-2 focus:ring-green-100"
             />
             <div className="w-full flex flex-row gap-4 justify-center items-center mt-auto">
-              <Button variant="ghost" size="lg" onClick={handleBack} className="w-1/2"> <ChevronLeft className="mr-1 h-5 w-5" />Back</Button>
-              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="w-1/2 bg-green-500 hover:bg-green-600 text-white font-semibold">Next<ChevronRight className="ml-1 h-5 w-5" /></Button>
+              <Button variant="ghost" size="lg" onClick={handleBack} className="w-1/2"> <HiChevronLeft className="mr-1 h-5 w-5" />Back</Button>
+              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="w-1/2 bg-green-500 hover:bg-green-600 text-white font-semibold">Next<HiChevronRight className="ml-1 h-5 w-5" /></Button>
             </div>
             <div className="h-6" />
           </StepContainer>
@@ -245,8 +250,8 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
               />
             </div>
             <div className="w-full flex flex-row gap-4 justify-center items-center mt-auto">
-              <Button variant="ghost" size="lg" onClick={handleBack} className="w-1/2"> <ChevronLeft className="mr-1 h-5 w-5" />Back</Button>
-              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="w-1/2 bg-green-500 hover:bg-green-600 text-white font-semibold">Next<ChevronRight className="ml-1 h-5 w-5" /></Button>
+              <Button variant="ghost" size="lg" onClick={handleBack} className="w-1/2"> <HiChevronLeft className="mr-1 h-5 w-5" />Back</Button>
+              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="w-1/2 bg-green-500 hover:bg-green-600 text-white font-semibold">Next<HiChevronRight className="ml-1 h-5 w-5" /></Button>
             </div>
             <div className="h-6" />
           </StepContainer>
@@ -275,15 +280,15 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
                 >
                   <div className="relative">
                     <Icon className="w-8 h-8 mb-1 text-gray-700 group-hover:scale-110 transition-transform" />
-                    {selectedIcon === name && <Check className="w-5 h-5 text-green-500 absolute -top-2 -right-2 bg-white rounded-full shadow" />}
+                    {selectedIcon === name && <HiCheck className="w-5 h-5 text-green-500 absolute -top-2 -right-2 bg-white rounded-full shadow" />}
                   </div>
                   <span className="text-xs truncate w-full mt-1 text-gray-600">{name}</span>
                 </button>
               ))}
             </div>
             <DialogFooter className="w-full flex justify-between mt-10">
-              <Button variant="ghost" size="lg" onClick={handleBack}><ChevronLeft className="mr-1 h-5 w-5" />Back</Button>
-              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="bg-green-500 hover:bg-green-600 text-white font-semibold">Next<ChevronRight className="ml-1 h-5 w-5" /></Button>
+              <Button variant="ghost" size="lg" onClick={handleBack}><HiChevronLeft className="mr-1 h-5 w-5" />Back</Button>
+              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="bg-green-500 hover:bg-green-600 text-white font-semibold">Next<HiChevronRight className="ml-1 h-5 w-5" /></Button>
             </DialogFooter>
           </StepContainer>
         )}
@@ -305,7 +310,7 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
                   aria-label={preset.name}
                   title={preset.name}
                 >
-                  {color === preset.hex && <Check className="w-7 h-7 text-white drop-shadow" />}
+                  {color === preset.hex && <HiCheck className="w-7 h-7 text-white drop-shadow" />}
                   <span className="text-xs mt-2 text-gray-700 font-medium select-none pointer-events-none" style={{textShadow:'0 1px 2px #fff8'}}>{preset.name}</span>
                 </button>
               ))}
@@ -323,8 +328,8 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
               </div>
             </div>
             <DialogFooter className="w-full flex justify-between mt-10">
-              <Button variant="ghost" size="lg" onClick={handleBack}><ChevronLeft className="mr-1 h-5 w-5" />Back</Button>
-              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="bg-green-500 hover:bg-green-600 text-white font-semibold">Next<ChevronRight className="ml-1 h-5 w-5" /></Button>
+              <Button variant="ghost" size="lg" onClick={handleBack}><HiChevronLeft className="mr-1 h-5 w-5" />Back</Button>
+              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="bg-green-500 hover:bg-green-600 text-white font-semibold">Next<HiChevronRight className="ml-1 h-5 w-5" /></Button>
             </DialogFooter>
           </StepContainer>
         )}
@@ -346,13 +351,13 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
                 >
                   {opt.icon}
                   {opt.label}
-                  {recurring === opt.value && <Check className="w-5 h-5 text-green-500 ml-2" />}
+                  {recurring === opt.value && <HiCheck className="w-5 h-5 text-green-500 ml-2" />}
                 </button>
               ))}
             </div>
             <DialogFooter className="w-full flex justify-between mt-10">
-              <Button variant="ghost" size="lg" onClick={handleBack}><ChevronLeft className="mr-1 h-5 w-5" />Back</Button>
-              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="bg-green-500 hover:bg-green-600 text-white font-semibold">Next<ChevronRight className="ml-1 h-5 w-5" /></Button>
+              <Button variant="ghost" size="lg" onClick={handleBack}><HiChevronLeft className="mr-1 h-5 w-5" />Back</Button>
+              <Button size="lg" onClick={handleNext} disabled={!canNext()} className="bg-green-500 hover:bg-green-600 text-white font-semibold">Next<HiChevronRight className="ml-1 h-5 w-5" /></Button>
             </DialogFooter>
           </StepContainer>
         )}
@@ -361,7 +366,7 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
           <StepContainer>
             <DialogHeader className="w-full">
               <DialogTitle className="text-3xl font-extrabold mb-4 text-green-600 flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-8 h-8 text-green-500 animate-pulse" />
+                <HiCheckCircle className="w-8 h-8 text-green-500 animate-pulse" />
                 Amazing!
               </DialogTitle>
               <DialogDescription className="mb-8 text-lg text-gray-600">You've created a new category for your budget.</DialogDescription>
@@ -401,4 +406,4 @@ export default function NewBudgetWizardModal({ open, onOpenChange }: NewBudgetWi
       </DialogContent>
     </Dialog>
   );
-} 
+}

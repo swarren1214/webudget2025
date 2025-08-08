@@ -26,7 +26,7 @@ function Layout({ children }: LayoutProps) {
   }, [showMobileSidebar]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
       {/* Sidebar (fixed for desktop, overlay for mobile) */}
       <div>
         {/* Desktop Sidebar */}
