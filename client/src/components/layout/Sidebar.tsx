@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Home, Banknote, Repeat, Settings } from "lucide-react";
+import { AppWindow, Building, CreditCard, ArrowLeftRight, BarChart } from "lucide-react";
 
 interface SidebarProps {
   className?: string;
@@ -8,10 +8,11 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Accounts", href: "/accounts", icon: Banknote },
-  { name: "Transactions", href: "/transactions", icon: Repeat },
-  { name: "Transfers", href: "/transfers", icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: AppWindow },
+  { name: "Accounts", href: "/accounts", icon: Building },
+  { name: "Transactions", href: "/transactions", icon: CreditCard },
+  { name: "Budgets", href: "/budgets", icon: BarChart },
+  { name: "Transfers", href: "/transfers", icon: ArrowLeftRight },
 ];
 
 function Sidebar({ className, onClose }: SidebarProps) {
@@ -20,7 +21,7 @@ function Sidebar({ className, onClose }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex flex-col min-h-screen bg-big-grinch bg-cover bg-no-repeat text-white shadow-lg",
+        "flex flex-col min-h-screen bg-gradient-to-r from-bigGrinch to-littleGrinch dark:bg-gray-900 text-white shadow-lg",
         className
       )}
     >
@@ -34,7 +35,7 @@ function Sidebar({ className, onClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-1">
+      <nav className="flex-col px-4 py-6 space-y-2">
         {navItems.map((item) => {
           const isActive = location === item.href;
 
@@ -46,9 +47,9 @@ function Sidebar({ className, onClose }: SidebarProps) {
                 onClose?.();
               }}
               className={cn(
-                "group flex items-center w-full px-3 py-2 rounded-md transition-colors text-sm font-medium",
+                "group flex items-center w-full px-4 py-3 rounded-xl transition-colors text-base font-bold",
                 isActive
-                  ? "bg-white/15 text-white"
+                  ? "bg-white/15 text-white shadow-sm"
                   : "hover:bg-white/10 hover:text-white"
               )}
             >
@@ -58,19 +59,6 @@ function Sidebar({ className, onClose }: SidebarProps) {
           );
         })}
       </nav>
-
-      {/* Footer (optional for user/account/settings links) */}
-      <div className="px-4 py-4 border-t border-white/10">
-        <button
-          onClick={() => {
-            // Future: open settings or sign out
-            console.log("TODO: settings or sign out");
-          }}
-          className="text-sm text-white/80 hover:text-white"
-        >
-          Settings
-        </button>
-      </div>
     </aside>
   );
 }

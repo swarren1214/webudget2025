@@ -10,6 +10,8 @@ import mainRouter from './api/routes';
 import { errorHandler } from './middleware/error.middleware';
 import { ConfigurationError } from './utils/errors';
 import { supabase } from './config/supabaseClient';
+import https from 'https';
+import fs from 'fs';
 
 // Handle configuration errors gracefully
 process.on('uncaughtException', (error) => {
@@ -28,6 +30,12 @@ process.on('uncaughtException', (error) => {
 // Initialize the Express application
 const app: Express = express();
 const port = config.PORT;
+
+// Load SSL certificate and key
+const httpsOptions = {
+  key: fs.readFileSync(config.SSL_KEY_PATH),
+  cert: fs.readFileSync(config.SSL_CERT_PATH),
+};
 
 // Test database connection endpoint
 app.get('/test-db', async (req, res) => {
@@ -58,7 +66,7 @@ app.use(pinoHttp({
 // Enable Cross-Origin Resource Sharing with development-specific configuration
 app.use(cors({
   origin: config.NODE_ENV === 'development' 
-    ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174', 'http://127.0.0.1:5175', 'http://127.0.0.1:3000']
+    ? ['https://localhost:5173', 'https://localhost:5174', 'https://localhost:5175', 'https://localhost:3000', 'https://127.0.0.1:5173', 'https://127.0.0.1:5174', 'https://127.0.0.1:5175', 'https://127.0.0.1:3000']
     : true, // In production, configure this more restrictively
   credentials: true,
   allowedHeaders: [
@@ -103,6 +111,6 @@ app.use('/', mainRouter);
 app.use(errorHandler);
 
 // --- Start the Server ---
-app.listen(port, '0.0.0.0', () => {
-  logger.info(`[server]: Server is running at http://0.0.0.0:${port}`);
+https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
+  logger.info(`[server]: Server is running at https://0.0.0.0:${port}`);
 });

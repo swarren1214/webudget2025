@@ -34,6 +34,7 @@ export const authMiddleware = async (
 ) => {
     try {
         console.log('Authorization Header:', req.headers.authorization);
+        console.log('Incoming Headers:', req.headers);
 
         const authHeader = req.headers.authorization;
 
@@ -48,6 +49,10 @@ export const authMiddleware = async (
         }
 
         const token = authHeader.split(' ')[1];
+        if (!token) {
+            console.error('Token is missing in the Authorization header.');
+            throw new UnauthorizedError('Token is required.');
+        }
 
         // Verify the token using the JWKS
         const { payload } = await jwtVerify(token, JWKS, {

@@ -22,4 +22,10 @@ export default defineConfig({
   },
   // Configure Vite to load .env files from the project root
   envDir: path.resolve(__dirname, ".."),
+  server: {
+    https: {
+      key: process.env.SSL_KEY_PATH || path.resolve(__dirname, "../certs/localhost-key.pem"),
+      cert: process.env.SSL_CERT_PATH || path.resolve(__dirname, "../certs/localhost.pem"),
+    },
+  },
 });

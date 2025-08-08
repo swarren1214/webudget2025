@@ -223,20 +223,22 @@ function Transactions() {
       
       <TransactionDetailsModal
         open={!!selectedTransaction}
-        onOpenChange={(open) => { if (!open) setSelectedTransaction(null); }}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTransaction(null);
+        }}
         transaction={selectedTransaction}
         budgets={budgetCategories ? budgetCategories.map(b => ({ name: b.name, color: b.color, icon: 'default-icon' })) : []}
       />
-      
-      <AddTransactionModal 
-        open={showAddTransactionModal} 
-        onOpenChange={setShowAddTransactionModal} 
-        accounts={accounts || []} 
-        categories={categories} 
-        onSave={(transaction) => addTransactionMutation.mutate({ ...transaction, date: new Date(transaction.date) })} 
-      />
-      
-      {(isLoadingTransactions || isLoadingAccounts || isLoadingBudgets) ? (
+              
+              <AddTransactionModal 
+          open={showAddTransactionModal} 
+          onOpenChange={setShowAddTransactionModal} 
+          accounts={accounts || []} 
+          categories={categories} 
+          onSave={(transaction) => addTransactionMutation.mutate({ ...transaction, date: new Date(transaction.date) })} 
+              />
+              
+              {(isLoadingTransactions || isLoadingAccounts || isLoadingBudgets) ? (
         <div className="space-y-4">
           <Skeleton className="h-[400px] w-full" />
         </div>

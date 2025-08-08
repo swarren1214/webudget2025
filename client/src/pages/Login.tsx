@@ -64,12 +64,22 @@ const LoginPage: React.FC = () => {
 		setLoading(true);
 		setError(null);
 		setSuccess(false);
-		const { error } = await supabase.auth.signInWithPassword({ email, password });
-		if (error) setError(error.message);
-		else {
+
+		const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+		if (error) {
+			setError(error.message);
+		} else if (data.session) {
+			// Store the token in localStorage
+			localStorage.setItem('authToken', data.session.access_token);
+
+			// Optionally store the refresh token
+			localStorage.setItem('refreshToken', data.session.refresh_token);
+
 			setSuccess(true);
 			navigate('/dashboard');
 		}
+
 		setLoading(false);
 	};
 
@@ -77,9 +87,19 @@ const LoginPage: React.FC = () => {
 		setLoading(true);
 		setError(null);
 		setSuccess(false);
-		const { error } = await supabase.auth.signInWithOAuth({ provider });
-		if (error) setError(error.message);
-		setLoading(false);
+
+		const { error } = await supabase.auth.signInWithOAuth({
+			provider,
+			options: {
+				redirectTo: `${window.location.origin}/dashboard`
+			}
+		});
+
+		if (error) {
+			setError(error.message);
+			setLoading(false);
+		}
+		// No need to handle session here; user will be redirected by Supabase.
 	};
 
 	return (

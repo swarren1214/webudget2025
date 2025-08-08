@@ -49,7 +49,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import NewBudgetWizardModal from "@/components/modals/NewBudgetWizardModal";
-import { apiFetch } from '../utils/apiFetch';
+import { apiFetch } from '@/lib/backendApi';
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const budgetFormSchema = z.object({

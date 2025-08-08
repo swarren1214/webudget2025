@@ -3,12 +3,9 @@ import { z } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { ConfigurationError } from '../utils/errors';
 import dotenv from 'dotenv';
-import path from 'path';
 
 // Load the .env file from the project root
-dotenv.config({
-    path: path.resolve(__dirname, '../../../.env'),
-});
+dotenv.config();
 
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -21,6 +18,8 @@ const envSchema = z.object({
     PLAID_SECRET: z.string().min(1, { message: 'PLAID_SECRET is a required field' }),
     PLAID_ENV: z.enum(['sandbox', 'development', 'production']),
     SUPABASE_JWT_SECRET: z.string().min(1, { message: 'SUPABASE_JWT_SECRET is a required field' }),
+    SSL_CERT_PATH: z.string().default('./certs/localhost.pem'),
+    SSL_KEY_PATH: z.string().default('./certs/localhost-key.pem'),
 });
 
 let config: z.infer<typeof envSchema>;

@@ -18,6 +18,11 @@ export default {
         border: 'hsl(var(--border))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        bigGrinch: '#06A730',
+        littleGrinch: '#1DCC67',
+        bigGrinchHover: '#059326',
+        littleGrinchHover: '#1DBB5F',
+
         // ...other custom colors...
       },
       keyframes: {
@@ -25,9 +30,6 @@ export default {
       },
       animation: {
         // ... your animation config ...
-      },
-      backgroundImage: {
-        'big-grinch': 'linear-gradient(270deg, #1DCC67 0.19%, #009F23 99.92%)',
       },
     },
   },

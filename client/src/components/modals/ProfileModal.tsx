@@ -106,7 +106,7 @@ export default function ProfileModal({ isOpen, onClose, user, onSave, onDelete }
               )}
             </Avatar>
             <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-            <div className="text-xs text-center text-primary mt-1">Upload/Edit Photo</div>
+            <div className="text-xs text-center text-gray-900 dark:text-white mt-1">Upload/Edit Photo</div>
           </label>
           <div className="w-full flex gap-2">
             <Input placeholder="First Name" value={firstName} onChange={e => setFirstName(e.target.value)} />

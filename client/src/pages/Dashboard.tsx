@@ -6,11 +6,11 @@ import ConnectedAccounts from "@/components/dashboard/ConnectedAccounts";
 import RecentTransactions from "@/components/dashboard/RecentTransactions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter } from "lucide-react";
+import { HiOutlineSearch, HiOutlineFilter } from "react-icons/hi";
 import { Skeleton } from "@/components/ui/skeleton";
 import ConnectAccountModal from "@/components/modals/ConnectAccountModal";
 import TransferModal from "@/components/modals/TransferModal";
-import { apiFetch } from '../utils/apiFetch';
+import { apiFetch } from '@/lib/backendApi';
 import { type Account, type BudgetCategory, type Transaction } from "@shared/schema";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -74,30 +74,30 @@ function Dashboard() {
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold mb-2 md:mb-0">Dashboard</h1>
         <div className="flex space-x-2">
-          <div className="relative">
+          <div className="">
             <Input
               type="text"
-              placeholder="Search transactions..."
-              className="pl-10 pr-4 py-2"
+              placeholder="Search..."
+              icon={<HiOutlineSearch />}
+              iconPosition="left"
+              className="pr-4 py-2 focus:outline-none"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           </div>
-          <Button variant="outline" size="sm" className="flex items-center">
-            <Filter className="mr-2 h-4 w-4" />
-            Filter
+          <Button variant="secondary" size="icon" className="flex items-center">
+            <HiOutlineFilter className="h-5 w-5" />
           </Button>
         </div>
       </div>
       
       {/* Financial Summary Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         {isLoadingAccounts ? (
           <>
-            <Skeleton className="h-[150px] rounded-xl" />
-            <Skeleton className="h-[150px] rounded-xl" />
-            <Skeleton className="h-[150px] rounded-xl" />
+            <Skeleton className="h-[150px] rounded-2xl" />
+            <Skeleton className="h-[150px] rounded-2xl" />
+            <Skeleton className="h-[150px] rounded-2xl" />
           </>
         ) : (
           <>
@@ -108,7 +108,9 @@ function Dashboard() {
               changePercent={6.2}
               changeText="this month"
               icon="account_balance_wallet"
-              iconColor="text-primary"
+              iconColor="text-white"
+              className="bg-gradient-to-r from-purple-700 to-purple-500 dark:from-purple-800 dark:to-purple-600 text-white rounded-2xl shadow-xl"
+              titleClassName="text-white"
             />
             <SummaryCard 
               title="Monthly Income" 
@@ -117,7 +119,9 @@ function Dashboard() {
               changePercent={4.8}
               changeText="vs. last month"
               icon="trending_up"
-              iconColor="text-green-500"
+              iconColor="text-white"
+              className="bg-gradient-to-r from-green-700 to-green-500 dark:from-green-800 dark:to-green-600 text-white rounded-2xl shadow-xl"
+              titleClassName="text-white"
             />
             <SummaryCard 
               title="Monthly Expenses" 
@@ -126,16 +130,18 @@ function Dashboard() {
               changePercent={-3.1}
               changeText="vs. last month"
               icon="trending_down"
-              iconColor="text-red-500"
+              iconColor="white"
+              className="bg-gradient-to-r from-red-700 to-red-500 dark:from-red-800 dark:to-red-600 text-white rounded-2xl shadow-xl"
+              titleClassName="text-white"
             />
           </>
         )}
       </div>
       
       {/* Budget Progress Section */}
-      <div className="mb-6">
+      <div className="">
         {isLoadingBudgets ? (
-          <Skeleton className="h-[300px] rounded-xl" />
+          <Skeleton className="h-[300px] rounded-2xl" />
         ) : (
           <BudgetProgress categories={budgetCategories || []} transactions={recentTransactions || []} />
         )}
